@@ -1,0 +1,49 @@
+git init# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+1. Nhóm UI & Styling (Giao diện cực đẹp)
+Đây là những thứ làm nên bộ mặt của dự án:
+
+Tailwind CSS: Framework CSS tiện nhất thế giới hiện nay.
+
+Lucide React: Bộ icon mã nguồn mở, rất gọn và hiện đại (thay thế FontAwesome).
+
+Framer Motion: Thư viện làm animation (hiệu ứng trượt, mờ dần, loading) cực mượt.
+
+Shadcn/UI: Không hẳn là một gói cài đặt, nhưng là bộ component (Button, Input, Card...) đẹp nhất hiện nay cho React.
+
+2. Nhóm Logic & API (Kết nối Backend)
+Axios: Thư viện để gửi request lên Flask Backend (thay cho fetch mặc định, code sẽ sạch hơn).
+
+TanStack Query (@tanstack/react-query): Cực kỳ quan trọng! Nó giúp tự động lấy lại dữ liệu (refetch), quản lý trạng thái loading và cache dữ liệu Key cực chuyên nghiệp.
+
+React Hook Form: Giúp bạn xử lý các ô nhập liệu (như khi tạo Key mới) nhanh và không bị lag.
+
+3. Nhóm Điều hướng & Quản lý (Architecture)
+React Router Dom: Nếu bạn muốn web có nhiều trang (Trang chủ, Trang Dashboard, Trang cài đặt).
+
+Zustand: Một thư viện quản lý trạng thái (State) siêu nhẹ (nhẹ hơn Redux rất nhiều), dùng để lưu thông tin Admin sau khi đăng nhập.
+
+dung dong nay nhe
