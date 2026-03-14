@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Copy, Clock, Key, Plus, Trash2, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { keyService } from '../api/keyService';
 
 function KeyDashboard() {
   const navigate = useNavigate();
@@ -15,12 +16,14 @@ function KeyDashboard() {
 
   const loadKeys = async () => {
     try {
-      const response = await fetch('/api/keys');
-      const data = await response.json();
-      setKeys(data.keys || []);
-      updateStats(data.keys || []);
+      const data = await keyService.getAllKeys();
+      // Backend returns { success: true, data: [...] }
+      const keysData = data.data || [];
+      setKeys(keysData);
+      updateStats(keysData);
     } catch (error) {
-      // Demo data
+      console.error('Error loading keys:', error);
+      // Demo data if API fails
       const demoKeys = [
         {
           id: '1',
@@ -68,7 +71,7 @@ function KeyDashboard() {
 
   const renewKey = async (keyId) => {
     try {
-      await fetch(`/api/renew-key/${keyId}`, { method: 'POST' });
+      await keyService.updateKey(keyId, { duration: 86400 }); // +24 hours
       showNotification('Gia hạn thành công!', 'success');
       loadKeys();
     } catch (error) {
@@ -80,7 +83,7 @@ function KeyDashboard() {
     if (!confirm('Bạn có chắc muốn xóa key này?')) return;
     
     try {
-      await fetch(`/api/delete-key/${keyId}`, { method: 'DELETE' });
+      await keyService.deleteKey(keyId);
       showNotification('Đã xóa key!', 'success');
       loadKeys();
     } catch (error) {
