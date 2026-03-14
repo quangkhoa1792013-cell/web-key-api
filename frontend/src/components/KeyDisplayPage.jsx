@@ -1,154 +1,376 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Clock, Key, Copy, RefreshCw, CheckCircle, ChevronLeft, Zap, Loader2, Fingerprint, AlertCircle, ArrowLeft } from 'lucide-react';
 
 function KeyDisplayPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [keys, setKeys] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(true);
+  const [countdown, setCountdown] = useState(10);
+  const [showToast, setShowToast] = useState(null);
+  const [isExpired, setIsExpired] = useState(false);
+  const [deviceId, setDeviceId] = useState('');
+
+  // Load existing key from localStorage on mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('currentKey');
+    if (savedKey) {
+      try {
+        const keyData = JSON.parse(savedKey);
+        const now = Date.now();
+        const expiresAt = keyData.createdAt ? new Date(keyData.createdAt).getTime() + (keyData.duration * 1000) : 0;
+        
+        if (expiresAt > now) {
+          // Key still valid, calculate remaining time
+          const timeLeft = Math.floor((expiresAt - now) / 1000);
+          setKeys([{ ...keyData, timeLeft }]);
+          setGenerating(false);
+          setCountdown(0);
+        } else {
+          // Key expired, clear it
+          localStorage.removeItem('currentKey');
+          setIsExpired(true);
+        }
+      } catch (e) {
+        localStorage.removeItem('currentKey');
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    // Generate key on page load
-    generateKey();
-  }, []);
+    if (generating && countdown > 0) {
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            generateKey();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [generating, countdown]);
+
+  // Handle expiration - redirect to time selection
+  useEffect(() => {
+    if (isExpired) {
+      // Clear expired key
+      localStorage.removeItem('currentKey');
+      // Redirect after 3 seconds
+      const timer = setTimeout(() => {
+        navigate('/');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isExpired, navigate]);
+
+  // Save key to localStorage whenever keys change
+  useEffect(() => {
+    if (keys.length > 0 && !generating) {
+      localStorage.setItem('currentKey', JSON.stringify(keys[0]));
+    }
+  }, [keys, generating]);
+
+  // Countdown timer for key expiration
+  useEffect(() => {
+    if (!generating && keys.length > 0 && !isExpired) {
+      const interval = setInterval(() => {
+        setKeys(prevKeys => {
+          const updatedKeys = prevKeys.map(key => {
+            const newTimeLeft = Math.max(0, key.timeLeft - 1);
+            if (newTimeLeft === 0 && key.timeLeft > 0) {
+              setIsExpired(true);
+            }
+            return { ...key, timeLeft: newTimeLeft };
+          });
+          return updatedKeys;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [generating, keys.length, isExpired]);
 
   const generateKey = async () => {
     const selectedTime = parseInt(localStorage.getItem('selectedTime') || '4');
+    const urlParams = searchParams.toString();
     
     try {
       const response = await fetch('/api/create-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration: selectedTime * 3600 })
+        body: JSON.stringify({ 
+          duration: selectedTime * 3600,
+          deviceId: deviceId,
+          urlParams: urlParams
+        })
       });
       
       const result = await response.json();
       
       if (result.success) {
         setKeys([{ 
+          id: result.id || '1',
           key: result.key, 
           duration: result.duration,
-          timeLeft: result.duration 
+          timeLeft: result.duration,
+          status: 'ACTIVE',
+          hwid: deviceId,
+          createdAt: new Date().toISOString()
         }]);
       }
     } catch (error) {
-      // Demo mode
       const demoKey = `KHOA-${selectedTime}H-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
       setKeys([{ 
+        id: 'demo-1',
         key: demoKey, 
         duration: selectedTime * 3600,
-        timeLeft: selectedTime * 3600 
+        timeLeft: selectedTime * 3600,
+        status: 'ACTIVE',
+        hwid: deviceId,
+        createdAt: new Date().toISOString()
       }]);
     } finally {
-      setLoading(false);
+      setGenerating(false);
     }
   };
 
   const copyKey = (key) => {
     navigator.clipboard.writeText(key);
-    showToast('Đã copy key!');
+    showNotification('Đã copy key!', 'success');
   };
 
-  const showToast = (message) => {
-    const toast = document.createElement('div');
-    toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-xl z-50';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+  const showNotification = (message, type = 'success') => {
+    setShowToast({ message, type });
+    setTimeout(() => setShowToast(null), 3000);
+  };
+
+  const renewKey = async (keyId) => {
+    try {
+      await fetch(`/api/renew-key/${keyId}`, { method: 'POST' });
+      setKeys(prevKeys => prevKeys.map(key => 
+        key.id === keyId 
+          ? { ...key, timeLeft: key.timeLeft + 86400 }
+          : key
+      ));
+      showNotification('Gia hạn +24H thành công!', 'success');
+    } catch (error) {
+      setKeys(prevKeys => prevKeys.map(key => 
+        key.id === keyId 
+          ? { ...key, timeLeft: key.timeLeft + 86400 }
+          : key
+      ));
+      showNotification('Gia hạn +24H!', 'success');
+    }
   };
 
   const formatTime = (seconds) => {
+    if (!seconds || seconds <= 0) return '00:00:00';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  if (loading) {
+  if (generating) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white text-xl">Đang tạo key...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+            <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-4">Đang tạo key...</h2>
+          <div className="text-5xl font-mono font-bold text-blue-400 mb-4">
+            00:00:{countdown.toString().padStart(2, '0')}
+          </div>
+          <div className="w-64 h-3 bg-slate-700 rounded-full overflow-hidden mx-auto mb-4">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-1000"
+              style={{ width: `${((10 - countdown) / 10) * 100}%` }}
+            />
+          </div>
+          <p className="text-slate-400">Hệ thống đang khởi tạo key cho bạn...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+      {/* Toast */}
+      {showToast && (
+        <div className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-xl z-50 animate-fade-in ${
+          showToast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        } text-white`}>
+          {showToast.message}
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">KhoaDz Script Key</h1>
-          <p className="text-gray-400">Key của bạn đã sẵn sàng</p>
+        <div className="flex items-center gap-4 mb-8">
+          <button
+            onClick={() => navigate('/skip')}
+            className="p-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-slate-400" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Nhận Key</h1>
+            <p className="text-slate-400 text-sm">Bước 3/3 - Key của bạn đã sẵn sàng</p>
+          </div>
         </div>
 
-        {/* Keys Table */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-700">
-                <th className="text-left py-4 px-6 text-gray-400 text-sm font-semibold uppercase tracking-wider">
-                  YOUR KEYS ({keys.length}/1)
-                </th>
-                <th className="text-center py-4 px-6 text-gray-400 text-sm font-semibold uppercase tracking-wider">
-                  TIME LEFT
-                </th>
-                <th className="text-center py-4 px-6 text-gray-400 text-sm font-semibold uppercase tracking-wider">
-                  STATUS
-                </th>
-                <th className="text-center py-4 px-6 text-gray-400 text-sm font-semibold uppercase tracking-wider">
-                  ACTIONS
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {keys.map((keyData, index) => (
-                <tr key={index} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
-                  <td className="py-5 px-6">
+        {/* Progress Steps - Fix: All completed steps show checkmark */}
+        <div className="flex items-center justify-between mb-8">
+          {[1, 2, 3].map((step, index) => (
+            <div key={step} className="flex items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
+                index < 3 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-slate-700 text-slate-400'
+              }`}>
+                {index < 3 ? <CheckCircle className="w-5 h-5" /> : step}
+              </div>
+              {index < 2 && (
+                <div className={`w-20 h-1 mx-2 ${
+                  index < 2 ? 'bg-green-500' : 'bg-slate-700'
+                }`} />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Expired State */}
+        {isExpired ? (
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-red-500/30 p-12 text-center">
+            <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="w-10 h-10 text-red-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-4">Key đã hết hạn</h2>
+            <p className="text-slate-400 mb-8">Key của bạn đã hết hạn. Vui lòng quay lại để tạo key mới.</p>
+            <button
+              onClick={() => navigate('/skip')}
+              className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-lg transition-all duration-200 mx-auto"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Quay lại tạo key mới
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Key Card */}
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-8 mb-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
+                  <Key className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Key đã được tạo</h2>
+                  <p className="text-slate-400 text-sm">Thời gian còn lại đang được cập nhật real-time</p>
+                </div>
+              </div>
+
+              {keys.map((keyData) => (
+                <div key={keyData.id} className="space-y-6">
+                  {/* Key Display */}
+                  <div className="bg-slate-900/50 rounded-xl p-6 border border-slate-700">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-slate-400 text-sm font-medium">Key của bạn</span>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                        keyData.status === 'ACTIVE'
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      }`}>
+                        <span className="w-2 h-2 bg-current rounded-full mr-2 animate-pulse" />
+                        {keyData.status === 'ACTIVE' ? 'Đang hoạt động' : 'Hết hạn'}
+                      </span>
+                    </div>
+                    
                     <div className="flex items-center gap-3">
+                      <code className="flex-1 bg-slate-800 rounded-lg px-4 py-3 font-mono text-lg text-white">
+                        {keyData.key}
+                      </code>
                       <button
                         onClick={() => copyKey(keyData.key)}
-                        className="p-2 bg-gray-700/50 hover:bg-gray-600/50 rounded transition-colors"
+                        className="p-3 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors"
+                        title="Copy key"
                       >
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
+                        <Copy className="w-5 h-5" />
                       </button>
-                      <div className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-lg">
-                        🔑
-                      </div>
-                      <span className="font-mono text-white text-sm">{keyData.key}</span>
+                      <button
+                        onClick={() => renewKey(keyData.id)}
+                        className="p-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors"
+                        title="Gia hạn key"
+                      >
+                        <RefreshCw className="w-5 h-5" />
+                      </button>
                     </div>
-                  </td>
-                  <td className="py-5 px-6 text-center">
-                    <span className="text-green-400 font-mono">{formatTime(keyData.timeLeft)}</span>
-                  </td>
-                  <td className="py-5 px-6 text-center">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/30">
-                      active
-                    </span>
-                  </td>
-                  <td className="py-5 px-6 text-center">
-                    <button className="inline-flex items-center gap-1 px-3 py-1.5 border border-green-500/50 text-green-400 hover:bg-green-500/20 rounded-lg text-sm font-medium transition-colors">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      + 24H
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
 
-        {/* Back Button */}
-        <div className="mt-8 text-center">
-          <button 
-            onClick={() => navigate('/skip')} 
-            className="px-6 py-3 bg-gray-700/50 hover:bg-gray-600/50 text-white rounded-lg transition-colors"
-          >
-            ← Quay lại
-          </button>
-        </div>
+                  {/* Status Grid - 5 cards: Time left, Duration, Status, HWID */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
+                        <Clock className="w-4 h-4" />
+                        <span>Thời gian còn lại</span>
+                      </div>
+                      <p className="text-2xl font-mono font-bold text-green-400">
+                        {formatTime(keyData.timeLeft)}
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
+                        <Zap className="w-4 h-4" />
+                        <span>Thời hạn key</span>
+                      </div>
+                      <p className="text-xl font-bold text-white">
+                        {Math.floor(keyData.duration / 3600)} giờ
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Trạng thái</span>
+                      </div>
+                      <p className={`text-lg font-bold ${
+                        keyData.status === 'ACTIVE' ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {keyData.status === 'ACTIVE' ? 'Hoạt động' : 'Hết hạn'}
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
+                      <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
+                        <Fingerprint className="w-4 h-4" />
+                        <span>HWID</span>
+                      </div>
+                      <p className="text-sm font-mono text-slate-300 truncate" title={keyData.hwid}>
+                        {keyData.hwid || deviceId}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Instructions */}
+            <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-6">
+              <h3 className="text-white font-semibold mb-4">Hướng dẫn sử dụng</h3>
+              <ol className="space-y-2 text-slate-400 text-sm list-decimal list-inside">
+                <li>Copy key bằng cách nhấn nút Copy bên cạnh key</li>
+                <li>Mở Roblox và script của bạn</li>
+                <li>Dán key vào ô nhập key trong script</li>
+                <li>Nhấn "Xác nhận" để kích hoạt</li>
+                <li>Key sẽ tự động hết hạn sau thời gian đã chọn</li>
+              </ol>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
