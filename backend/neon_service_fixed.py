@@ -56,7 +56,7 @@ def get_database_url():
     log_error("Using LOCAL_DB_URL as fallback")
     return local_db_url
 
-# Neon Database connection với SSL fix
+# Neon Database connection with proper URL parsing
 NEON_DB_URL = get_database_url()
 
 class NeonKeySystem:
@@ -67,25 +67,35 @@ class NeonKeySystem:
         self.init_tables()  # Auto-create tables on startup
     
     def parse_database_url(self):
-        """Parse DATABASE_URL với SSL fix cho PythonAnywhere"""
+        """Parse DATABASE_URL and ensure SSL mode (fix cho PythonAnywhere)"""
         if not NEON_DB_URL:
             log_error("DATABASE_URL not found in any source")
             return None
         
         try:
+            # Parse URL
             parsed = urlparse(NEON_DB_URL)
+            
+            # Extract connection parameters
             config = {
                 'host': parsed.hostname,
                 'port': parsed.port or 5432,
                 'database': parsed.path.lstrip('/'),
                 'user': parsed.username,
                 'password': parsed.password,
-                'sslmode': 'require'  # Hardcoded cho PythonAnywhere
             }
             
+            # Parse query parameters
+            query_params = parse_qs(parsed.query)
+            
+            # Đảm bảo sslmode=require, loại bỏ channel_binding gây lỗi
+            config['sslmode'] = 'require'
+            
+            # Log config (ẩn password)
             safe_config = config.copy()
             safe_config['password'] = '***'
             log_error(f"Database config: {safe_config}")
+            
             return config
             
         except Exception as e:
@@ -94,26 +104,29 @@ class NeonKeySystem:
             return None
     
     def connect_db(self):
-        """Connect to Neon Database với SSL fix"""
+        """Connect to Neon Database with auto-reconnect"""
         if not self.db_config:
             log_error("No database configuration available")
             return False
         
         try:
+            # Close existing connection if any
             if self.conn:
                 self.conn.close()
             
+            # Create new connection với SSL chỉ định
             self.conn = psycopg2.connect(
                 host=self.db_config['host'],
                 port=self.db_config['port'],
                 database=self.db_config['database'],
                 user=self.db_config['user'],
                 password=self.db_config['password'],
-                sslmode='require'  # Luôn có sslmode=require
+                sslmode='require'  # Hardcoded cho PythonAnywhere
             )
             
             self.conn.autocommit = True
             
+            # Test connection
             with self.conn.cursor() as cursor:
                 cursor.execute("SELECT 1")
                 cursor.fetchone()
@@ -123,12 +136,13 @@ class NeonKeySystem:
             
         except Exception as e:
             log_error(f"Database connection error: {e}")
+            log_error(f"Error type: {type(e).__name__}")
             log_error(f"Traceback: {traceback.format_exc()}")
             self.conn = None
             return False
     
     def init_tables(self):
-        """Auto-create tables"""
+        """Auto-create tables if they don't exist"""
         if not self.conn:
             log_error("Cannot create tables - no database connection")
             return False
@@ -169,7 +183,7 @@ class NeonKeySystem:
             return False
     
     def execute_query(self, query, params=None):
-        """Execute query với auto-reconnect"""
+        """Execute query with auto-reconnect capability"""
         try:
             if not self.conn:
                 if not self.connect_db():
@@ -190,6 +204,7 @@ class NeonKeySystem:
         except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
             log_error(f"Connection lost, attempting reconnect: {e}")
             
+            # Try to reconnect
             if self.connect_db():
                 log_error("Reconnected successfully")
                 try:
@@ -229,59 +244,60 @@ except Exception as e:
 
 @app.route('/api/test-db', methods=['GET'])
 def test_database():
-    """Test database connection"""
+    """Test database connection and table existence"""
     try:
         if not key_system:
-            return jsonify({'success': False, 'message': 'Key system not initialized'})
+            return jsonify({
+                'success': False,
+                'message': 'Key system not initialized'
+            })
         
+        # Test basic connection
         result = key_system.execute_query("SELECT 1")
         if not result:
-            return jsonify({'success': False, 'message': 'Database connection failed'})
+            return jsonify({
+                'success': False,
+                'message': 'Database connection failed'
+            })
         
-        return jsonify({'success': True, 'message': 'Database connection successful'})
+        # Test table existence
+        table_check = key_system.execute_query("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'user_sessions'
+        """)
+        
+        if not table_check:
+            return jsonify({
+                'success': False,
+                'message': 'Table user_sessions does not exist'
+            })
+        
+        # Test table structure
+        structure_check = key_system.execute_query("""
+            SELECT column_name, data_type 
+            FROM information_schema.columns 
+            WHERE table_name = 'user_sessions'
+            ORDER BY ordinal_position
+        """)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Database connection successful',
+            'table_exists': True,
+            'table_structure': structure_check
+        })
         
     except Exception as e:
         log_error(f"Database test error: {e}")
-        return jsonify({'success': False, 'message': f'Database test failed: {str(e)}'})
-
-@app.route('/api/check-key-status', methods=['GET'])
-def check_key_status():
-    """Check key status cho ServiceSelectionPage"""
-    try:
-        if not key_system:
-            return jsonify({'hasKey': False, 'status': 'error'})
-        
-        service = request.args.get('service', 'lootlab')
-        
-        query = """
-        SELECT COUNT(*) as count 
-        FROM user_sessions 
-        WHERE service = %s AND expire_ts > %s AND key LIKE 'KHOA-%'
-        """
-        
-        current_time = int(time.time())
-        result = key_system.execute_query(query, (service, current_time))
-        
-        if result and result[0][0] > 0:
-            return jsonify({
-                'hasKey': True,
-                'status': 'active',
-                'count': result[0][0]
-            })
-        else:
-            return jsonify({
-                'hasKey': False,
-                'status': 'none',
-                'count': 0
-            })
-            
-    except Exception as e:
-        log_error(f"Key status check error: {e}")
-        return jsonify({'hasKey': False, 'status': 'error'})
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'message': f'Database test failed: {str(e)}'
+        })
 
 @app.route('/api/mark-session', methods=['POST'])
 def mark_session():
-    """Mark session trước khi chuyển trang"""
+    """Mark session in database BEFORE frontend navigation"""
     try:
         if not key_system:
             return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
@@ -296,29 +312,34 @@ def mark_session():
             return jsonify({'success': False, 'message': 'Missing serviceId or randomId'}), 400
         
         # Check if session already exists
-        check_query = "SELECT id FROM user_sessions WHERE key = %s"
+        check_query = """
+        SELECT id FROM user_sessions 
+        WHERE key = %s
+        """
+        
         result = key_system.execute_query(check_query, (random_id,))
         
         if result:
             return jsonify({'success': False, 'message': 'Session already exists'}), 400
         
-        # Insert session marking
+        # Insert session marking into database
         insert_query = """
         INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         RETURNING id, expire_ts
         """
         
-        session_expire_ts = int(time.time()) + 1800  # 30 minutes
+        # Session expires in 30 minutes (1800 seconds)
+        session_expire_ts = int(time.time()) + 1800
         
         params = (
-            random_id,
-            service_id,
-            'PENDING',
-            ip_address,
-            session_expire_ts,
-            'PENDING_SESSION',
-            json.dumps({'ua': user_agent, 'marked_at': time.time()})
+            random_id,           # key = randomId for marking
+            service_id,          # service
+            'PENDING',           # status = PENDING
+            ip_address,          # ip_address
+            session_expire_ts,   # expire_ts (30 minutes)
+            'PENDING_SESSION',  # hwid = PENDING_SESSION
+            json.dumps({'ua': user_agent, 'marked_at': time.time()})  # cookies
         )
         
         result = key_system.execute_query(insert_query, params)
@@ -347,7 +368,7 @@ def mark_session():
 
 @app.route('/api/check-session-mark', methods=['POST'])
 def check_session_mark():
-    """Check session validity"""
+    """Check if session ID exists in database (for URL validation)"""
     try:
         if not key_system:
             return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
@@ -358,6 +379,7 @@ def check_session_mark():
         if not random_id:
             return jsonify({'success': False, 'message': 'Missing randomId'}), 400
         
+        # Check if session exists and is not expired
         check_query = """
         SELECT service, status, expire_ts FROM user_sessions 
         WHERE key = %s AND expire_ts > %s
@@ -368,13 +390,17 @@ def check_session_mark():
         
         if result:
             row = result[0]
+            service = row[0]
+            status = row[1]
+            expire_ts = row[2]
+            
             return jsonify({
                 'success': True,
                 'exists': True,
-                'service': row[0],
-                'status': row[1],
-                'expireTs': row[2],
-                'timeLeft': row[2] - current_time,
+                'service': service,
+                'status': status,
+                'expireTs': expire_ts,
+                'timeLeft': expire_ts - current_time,
                 'message': 'Session found and valid'
             })
         else:
@@ -386,6 +412,7 @@ def check_session_mark():
             
     except Exception as e:
         log_error(f"Session check error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/check-service-keys', methods=['GET'])
@@ -420,6 +447,7 @@ def check_service_keys():
             
     except Exception as e:
         log_error(f"Service keys check error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'hasKey': False, 'count': 0, 'nextExpiry': None})
 
 @app.route('/api/health', methods=['GET'])
@@ -427,7 +455,10 @@ def health_check():
     """Health check endpoint"""
     try:
         if not key_system:
-            return jsonify({'status': 'unhealthy', 'error': 'Key system not initialized'}), 500
+            return jsonify({
+                'status': 'unhealthy',
+                'error': 'Key system not initialized'
+            }), 500
         
         result = key_system.execute_query("SELECT 1")
         db_status = "connected" if result is not None else "disconnected"
@@ -439,16 +470,21 @@ def health_check():
         })
     except Exception as e:
         log_error(f"Health check error: {e}")
-        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 500
 
-# PythonAnywhere compatible - chỉ chạy app.run() khi local
-if __name__ == '__main__':
-    print("[NEON] 🚀 Starting Enhanced Neon Database System...")
-    print(f"[NEON] 📊 DATABASE_URL configured: {'Yes' if NEON_DB_URL else 'No'}")
-    
-    if key_system and key_system.conn:
-        print("[NEON] ✅ Database test passed - Ready to serve!")
-    else:
-        print("[NEON] ❌ Database test failed - Check configuration")
-    
-    app.run(host='0.0.0.0', port=5000, debug=True)
+# KHÔNG DÙNG app.run() cho PythonAnywhere
+# if __name__ == '__main__':
+#     print("[NEON] 🚀 Starting Enhanced Neon Database System...")
+#     print(f"[NEON] 📊 DATABASE_URL configured: {'Yes' if NEON_DB_URL else 'No'}")
+#     
+#     # Test database on startup
+#     if key_system and key_system.conn:
+#         print("[NEON] ✅ Database test passed - Ready to serve!")
+#     else:
+#         print("[NEON] ❌ Database test failed - Check configuration")
+#     
+#     app.run(host='0.0.0.0', port=5000, debug=True)
