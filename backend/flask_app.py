@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 # Cấu hình CORS cho phép frontend localhost:5173
 CORS(app, 
-     origins=['http://localhost:5173', 'https://khoablabla.pythonanywhere.com'],
+     origins=['http://localhost:5173', 'https://khoablabla2013.pythonanywhere.com'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
@@ -223,10 +223,15 @@ class NeonKeySystem:
 
 # Initialize key system
 try:
+    log_error("=== STARTING KEY SYSTEM INITIALIZATION ===")
+    log_error(f"DATABASE_URL: {NEON_DB_URL[:50]}...")
     key_system = NeonKeySystem()
-    log_error("Key system initialized successfully")
+    if key_system and key_system.conn:
+        log_error("✅ Key system initialized successfully - Database connected")
+    else:
+        log_error("❌ Key system initialized but database not connected")
 except Exception as e:
-    log_error(f"Failed to initialize key system: {e}")
+    log_error(f"❌ Failed to initialize key system: {e}")
     log_error(f"Traceback: {traceback.format_exc()}")
     key_system = None
 
