@@ -12,8 +12,6 @@ const services = [
 function ServiceSelectionPage() {
   const navigate = useNavigate();
   const [selectedService, setSelectedService] = useState(null);
-  const [generatedLink, setGeneratedLink] = useState('');
-  const [copied, setCopied] = useState(false);
   const [serviceKeys, setServiceKeys] = useState({});
   const [markingSession, setMarkingSession] = useState(false);
   const [markingError, setMarkingError] = useState(null);
@@ -26,16 +24,16 @@ function ServiceSelectionPage() {
       for (const service of services) {
         try {
           const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-          const response = await fetch(`${apiBaseUrl}/api/check-service-keys?service=${service.id}`);
+          const response = await fetch(`${apiBaseUrl}/api/check-key-status?service=${service.id}`);
           const result = await response.json();
           
           keys[service.id] = {
             hasKey: result.hasKey || false,
             count: result.count || 0,
-            nextExpiry: result.nextExpiry || null
+            status: result.status || 'none'
           };
         } catch (error) {
-          keys[service.id] = { hasKey: false, count: 0, nextExpiry: null };
+          keys[service.id] = { hasKey: false, count: 0, status: 'error' };
         }
       }
       
@@ -98,23 +96,6 @@ function ServiceSelectionPage() {
     }
   };
 
-  const copyLink = () => {
-    if (generatedLink) {
-      navigator.clipboard.writeText(generatedLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const resetAll = () => {
-    setSelectedService(null);
-    setGeneratedLink('');
-    setCopied(false);
-    localStorage.removeItem('selectedService');
-    localStorage.removeItem('randomId');
-    localStorage.removeItem('generatedLink');
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
       <div className="max-w-4xl mx-auto">
@@ -133,18 +114,17 @@ function ServiceSelectionPage() {
             const keyInfo = serviceKeys[service.id] || {};
             const hasKey = keyInfo.hasKey || false;
             const keyCount = keyInfo.count || 0;
-            const nextExpiry = keyInfo.nextExpiry;
             
             return (
               <button
                 key={service.id}
-                onClick={() => handleSelect(service.id)}
-                disabled={generatedLink !== ''}
+                onClick={() => handleServiceSelect(service.id)}
+                disabled={markingSession}
                 className={`p-8 rounded-xl border-2 transition-all duration-200 transform hover:scale-[1.02] ${
                   selectedService === service.id
                     ? 'border-blue-500 bg-gradient-to-br from-blue-500/10 to-blue-600/10 shadow-lg shadow-blue-500/20'
                     : 'border-slate-700/50 bg-slate-800/50 hover:border-slate-600/50'
-                } ${generatedLink ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${markingSession ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <div className="flex flex-col items-center space-y-4">
                   <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${service.color} flex items-center justify-center text-3xl shadow-lg`}>
@@ -155,25 +135,21 @@ function ServiceSelectionPage() {
                     <p className="text-slate-400 text-sm">Tạo phiên cho dịch vụ {service.name}</p>
                   </div>
                   
-                  {/* Key Status Indicator */}
-                  <div className="flex items-center gap-2">
+                  {/* Key Status */}
+                  <div className="flex items-center gap-2 mb-4">
                     {hasKey ? (
                       <>
                         <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                         <span className="text-green-400 text-sm font-medium">
-                          Key: {keyCount > 0 ? `${keyCount} active` : 'Có'}
+                          ● Đã có Key ({keyCount > 0 ? keyCount : '1'})
                         </span>
-                        {nextExpiry && (
-                          <span className="text-slate-500 text-xs">
-                            <Clock className="w-3 h-3 inline mr-1" />
-                            {new Date(nextExpiry * 1000).toLocaleTimeString()}
-                          </span>
-                        )}
                       </>
                     ) : (
                       <>
-                        <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-                        <span className="text-red-400 text-sm font-medium">Key: Không</span>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                        <span className="text-gray-400 text-sm font-medium">
+                          ○ Chưa có Key
+                        </span>
                       </>
                     )}
                   </div>
@@ -185,36 +161,50 @@ function ServiceSelectionPage() {
           })}
         </div>
 
-        {/* Generated Link Display */}
-        {generatedLink && (
+        {/* Start Button */}
+        {selectedService && (
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 mb-8 animate-fade-in">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Shield className="w-6 h-6 text-green-400" />
+                <Play className="w-6 h-6 text-blue-400" />
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Phiên đã tạo!</h3>
-                  <p className="text-slate-400 text-sm">Đang chuyển đến trang chọn thời gian...</p>
+                  <h3 className="text-lg font-semibold text-white">
+                    Xác nhận: Bắt đầu
+                  </h3>
+                  <p className="text-slate-400 text-sm">
+                    Tạo phiên cho {services.find(s => s.id === selectedService)?.name}
+                  </p>
                 </div>
               </div>
               
               <button
-                onClick={resetAll}
-                className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm"
+                onClick={handleStartProcess}
+                disabled={markingSession}
+                className={`px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 ${
+                  markingSession
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-blue-600/25 transform hover:scale-105'
+                }`}
               >
-                Tạo mới
+                {markingSession ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-transparent animate-spin rounded-full"></div>
+                    Đang đánh dấu...
+                  </div>
+                ) : (
+                  'Xác nhận: Bắt đầu'
+                )}
               </button>
             </div>
-            
-            <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
-              <div className="flex items-center justify-between">
-                <code className="text-blue-400 font-mono text-sm break-all flex-1">{generatedLink}</code>
-                <button
-                  onClick={copyLink}
-                  className="ml-4 p-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors"
-                >
-                  {copied ? <CheckCircle className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                </button>
-              </div>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {markingError && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 animate-shake">
+            <div className="flex items-center justify-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
+              <p className="text-red-400 text-sm text-left">{markingError}</p>
             </div>
           </div>
         )}
@@ -223,9 +213,10 @@ function ServiceSelectionPage() {
         <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-6">
           <h3 className="text-white font-semibold mb-4">Luồng hoạt động</h3>
           <ol className="space-y-2 text-slate-400 text-sm list-decimal list-inside">
-            <li>Chọn dịch vụ → Tạo phiên (ví dụ: /lootlab-8kL96Hj)</li>
-            <li>Chọn thời gian → Cố định URL (ví dụ: /lootlab-8kL96Hj/2h)</li>
-            <li>Vượt link → Nhận Key mới (ví dụ: /key?lootlab=abcXYZ123)</li>
+            <li>Chọn dịch vụ → Xem trạng thái Key</li>
+            <li>Nhấn "Xác nhận: Bắt đầu" → Đánh dấu phiên</li>
+            <li>Chuyển đến trang chọn thời gian → Cố định URL</li>
+            <li>Vượt link → Nhận Key mới</li>
             <li>Key tự hủy khi hết hạn</li>
           </ol>
         </div>

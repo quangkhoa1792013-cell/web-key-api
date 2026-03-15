@@ -44,9 +44,9 @@ function TimeSelectionPage() {
             timeLeft: result.timeLeft
           });
         } else {
-          // Session NOT found in database - ĐÁ VỀNG về home
+          // Session NOT found in database - ĐÁ VỀNG về home (Bảo mật Nạp Frontend)
           console.log(`[TimeSelection] ❌ Session not found in DB: ${serviceId}-${randomId}`);
-          console.log('[TimeSelection] 🚫 User tried to access unmarked URL - redirecting to home');
+          console.log('[TimeSelection] 🚫 Bảo mật: User tried to access unmarked URL - redirecting to home');
           setValidationError('Phiên không hợp lệ hoặc đã hết hạn');
           
           // Delay redirect để user thấy thông báo
