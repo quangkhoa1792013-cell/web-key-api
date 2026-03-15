@@ -2,7 +2,7 @@
 # Handle React Router routes
 
 # API routes - proxy to PythonAnywhere
-/api/*  https://khoablabla.pythonanywhere.com/:splat  200
+/api/*  https://khoablabla2013.pythonanywhere.com/:splat  200
 
 # React Router routes - serve index.html
 /*    /index.html   200
