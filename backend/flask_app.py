@@ -52,7 +52,7 @@ def get_database_url():
         log_error(f"Error reading .env file: {e}")
     
     # 3. Dùng LOCAL_DB_URL hardcoded (backup)
-    local_db_url = 'postgresql://neondb_owner:npg_yXhAo4sZaKb5@ep-patient-pond-a1virzy2-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
+    local_db_url = 'postgresql://neondb_owner:npg_QYUiysc38zPX@ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
     log_error("Using LOCAL_DB_URL as fallback")
     return local_db_url
 
