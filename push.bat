@@ -14,4 +14,3 @@ git push origin main
 
 echo.
 echo === XONG! ===
-timeout /t 3
