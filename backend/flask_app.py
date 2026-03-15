@@ -304,7 +304,7 @@ def mark_session():
         # Insert session marking
         insert_query = """
         INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         RETURNING id, expire_ts
         """
         
@@ -379,72 +379,6 @@ def check_key_status():
     except Exception as e:
         log_error(f"Key status check error: {e}")
         return jsonify({'hasKey': False, 'status': 'error'})
-
-@app.route('/api/mark-session', methods=['POST'])
-def mark_session():
-    """Lưu randomId vào bảng user_sessions với status là PENDING"""
-    try:
-        if not key_system:
-            return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
-        
-        data = request.get_json()
-        service_id = data.get('serviceId')
-        random_id = data.get('randomId')
-        ip_address = data.get('ipAddress', request.remote_addr)
-        user_agent = data.get('userAgent', request.headers.get('User-Agent', ''))
-        
-        if not service_id or not random_id:
-            return jsonify({'success': False, 'message': 'Missing serviceId or randomId'}), 400
-        
-        # Check if session already exists
-        check_query = "SELECT id FROM user_sessions WHERE key = %s"
-        result = key_system.execute_query(check_query, (random_id,))
-        
-        if result:
-            return jsonify({'success': False, 'message': 'Session already exists'}), 400
-        
-        # Insert session marking
-        insert_query = """
-        INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id, expire_ts
-        """
-        
-        session_expire_ts = int(time.time()) + 1800  # 30 minutes
-        
-        params = (
-            random_id,
-            service_id,
-            'PENDING',
-            ip_address,
-            session_expire_ts,
-            'PENDING_SESSION',
-            json.dumps({'ua': user_agent, 'marked_at': time.time()})
-        )
-        
-        result = key_system.execute_query(insert_query, params)
-        
-        if result:
-            session_id = result[0][0]
-            expire_ts = result[0][1]
-            
-            log_error(f"Session marked: {service_id}-{random_id} (ID: {session_id})")
-            
-            return jsonify({
-                'success': True,
-                'sessionId': session_id,
-                'randomId': random_id,
-                'serviceId': service_id,
-                'expireTs': expire_ts,
-                'message': 'Session marked successfully'
-            })
-        else:
-            return jsonify({'success': False, 'message': 'Failed to mark session'}), 500
-            
-    except Exception as e:
-        log_error(f"Session marking error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/check-session-mark', methods=['POST'])
 def check_session_mark():
