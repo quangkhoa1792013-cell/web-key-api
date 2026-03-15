@@ -15,7 +15,7 @@ function TimeSelectionPage() {
   const [isValidatingSession, setIsValidatingSession] = useState(true);
   const [validationError, setValidationError] = useState(null);
 
-  // BẢO MẬT NẠP FRONTEND - Validate session marking TRƯỚC KHI render
+  // Validate session marking TRƯỚC KHI render
   useEffect(() => {
     const validateSessionMarking = async () => {
       if (!serviceId || !randomId) {
@@ -44,7 +44,7 @@ function TimeSelectionPage() {
             timeLeft: result.timeLeft
           });
         } else {
-          // Session NOT found in database - ĐÁ VĂNG về home
+          // Session NOT found in database - ĐÁ VỀNG về home
           console.log(`[TimeSelection] ❌ Session not found in DB: ${serviceId}-${randomId}`);
           console.log('[TimeSelection] 🚫 User tried to access unmarked URL - redirecting to home');
           setValidationError('Phiên không hợp lệ hoặc đã hết hạn');

@@ -64,7 +64,7 @@ class NeonKeySystem:
         self.conn = None
         self.db_config = self.parse_database_url()
         self.connect_db()
-        self.init_tables()  # Auto-create tables on startup
+        self.init_tables()
     
     def parse_database_url(self):
         """Parse DATABASE_URL với SSL fix cho PythonAnywhere"""
@@ -305,7 +305,7 @@ def mark_session():
         # Insert session marking
         insert_query = """
         INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s)
         RETURNING id, expire_ts
         """
         
@@ -386,6 +386,62 @@ def check_session_mark():
             
     except Exception as e:
         log_error(f"Session check error: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/update-session-time', methods=['POST'])
+def update_session_time():
+    """Update session với time selection"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        service_id = data.get('serviceId')
+        random_id = data.get('randomId')
+        duration_hours = data.get('durationHours')
+        required_links = data.get('requiredLinks')
+        
+        if not all([service_id, random_id, duration_hours]):
+            return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+        
+        # Update session với time selection
+        update_query = """
+        UPDATE user_sessions 
+        SET status = 'TIME_SELECTED', 
+            expire_ts = %s,
+            cookies = %s
+        WHERE key = %s AND service = %s
+        RETURNING id, expire_ts
+        """
+        
+        new_expire_ts = int(time.time()) + (duration_hours * 3600)
+        cookies_data = json.dumps({
+            'duration_hours': duration_hours,
+            'required_links': required_links,
+            'time_selected_at': time.time()
+        })
+        
+        result = key_system.execute_query(update_query, (new_expire_ts, cookies_data, random_id, service_id))
+        
+        if result:
+            session_id = result[0][0]
+            expire_ts = result[0][1]
+            
+            log_error(f"Session updated with time: {service_id}-{random_id} ({duration_hours}h)")
+            
+            return jsonify({
+                'success': True,
+                'sessionId': session_id,
+                'durationHours': duration_hours,
+                'expireTs': expire_ts,
+                'message': 'Session time updated successfully'
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to update session time'}), 500
+            
+    except Exception as e:
+        log_error(f"Session time update error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/check-service-keys', methods=['GET'])
