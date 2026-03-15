@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Clock, ChevronRight, Key, Shield, ArrowLeft, AlertTriangle, Loader2 } from 'lucide-react';
+import { Clock, ChevronRight, Key, Shield, ArrowLeft } from 'lucide-react';
 
 function TimeSelectionPage() {
   const navigate = useNavigate();
@@ -12,60 +12,35 @@ function TimeSelectionPage() {
   
   const [selectedTime, setSelectedTime] = useState(null);
   const [sessionInfo, setSessionInfo] = useState(null);
-  const [isValidatingSession, setIsValidatingSession] = useState(true);
-  const [validationError, setValidationError] = useState(null);
 
-  // BẢO MẬT NẠP FRONTEND - Validate session marking TRƯỚC KHI render
+  // Check session validity on mount
   useEffect(() => {
-    const validateSessionMarking = async () => {
-      if (!serviceId || !randomId) {
-        console.log('[TimeSelection] ❌ Invalid URL format, redirecting to home');
-        navigate('/');
-        return;
-      }
-
+    const checkSession = async () => {
       try {
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-        const response = await fetch(`${apiBaseUrl}/api/check-session-mark`, {
+        const response = await fetch(`${apiBaseUrl}/api/check-session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ randomId })
+          body: JSON.stringify({ serviceId, randomId })
         });
         
         const result = await response.json();
         
-        if (result.success && result.exists) {
-          // Session exists in database - CHO PHÉP frontend render
-          console.log(`[TimeSelection] ✅ Session validated: ${serviceId}-${randomId}`);
-          setSessionInfo({
-            service: result.service,
-            status: result.status,
-            expireTs: result.expireTs,
-            timeLeft: result.timeLeft
-          });
+        if (result.success) {
+          setSessionInfo(result.session);
         } else {
-          // Session NOT found in database - ĐÁ VĂNG về home
-          console.log(`[TimeSelection] ❌ Session not found in DB: ${serviceId}-${randomId}`);
-          console.log('[TimeSelection] 🚫 User tried to access unmarked URL - redirecting to home');
-          setValidationError('Phiên không hợp lệ hoặc đã hết hạn');
-          
-          // Delay redirect để user thấy thông báo
-          setTimeout(() => {
-            navigate('/');
-          }, 2000);
+          // Session invalid, redirect to home
+          navigate('/');
         }
       } catch (error) {
-        console.error('[TimeSelection] ❌ Session validation failed:', error);
-        setValidationError('Lỗi kết nối đến server');
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
-      } finally {
-        setIsValidatingSession(false);
+        console.error('Session check failed:', error);
+        navigate('/');
       }
     };
 
-    validateSessionMarking();
+    if (serviceId && randomId) {
+      checkSession();
+    }
   }, [serviceId, randomId, navigate]);
 
   const timeOptions = [
@@ -104,9 +79,9 @@ function TimeSelectionPage() {
       });
       
       const result = await response.json();
-      console.log('[TimeSelection] Session updated with time:', result);
+      console.log('Session updated:', result);
     } catch (error) {
-      console.error('[TimeSelection] Failed to update session:', error);
+      console.error('Failed to update session:', error);
     }
   };
 
@@ -114,45 +89,12 @@ function TimeSelectionPage() {
     navigate('/');
   };
 
-  // Show loading while validating session
-  if (isValidatingSession) {
+  if (!sessionInfo) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <Loader2 className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-white mb-3">Đang kiểm tra phiên...</h2>
-          <p className="text-slate-400 mb-4">Xác thực đánh dấu trong Database</p>
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-            <div className="flex items-center justify-center gap-2">
-              <Shield className="w-5 h-5 text-blue-400" />
-              <p className="text-blue-400 text-sm">Bảo mật: Chỉ cho phép truy cập các phiên đã được đánh dấu</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error if session not found (will redirect automatically)
-  if (validationError || !sessionInfo) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-white mb-3">Phiên không hợp lệ</h2>
-          <p className="text-slate-400 mb-6">{validationError || 'URL không được đánh dấu trong Database'}</p>
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-              <p className="text-red-400 text-sm">Bạn sẽ được chuyển về trang chủ trong giây lát...</p>
-            </div>
-          </div>
-          <button
-            onClick={handleBack}
-            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-          >
-            Quay lại trang chủ
-          </button>
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white">Đang kiểm tra phiên...</p>
         </div>
       </div>
     );
@@ -184,10 +126,7 @@ function TimeSelectionPage() {
               <div>
                 <h3 className="text-lg font-semibold text-white">Dịch vụ: {serviceId}</h3>
                 <p className="text-slate-400 text-sm">Phiên: {randomId}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <p className="text-green-400 text-xs">✓ Phiên đã được đánh dấu trong Database</p>
-                </div>
+                <p className="text-green-400 text-xs">Phiên hợp lệ • Đang hoạt động</p>
               </div>
             </div>
             
@@ -255,25 +194,10 @@ function TimeSelectionPage() {
           </div>
         )}
 
-        {/* Session Validation Status */}
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 mb-8">
-          <div className="flex items-center gap-3">
-            <Shield className="w-5 h-5 text-green-400" />
-            <div>
-              <h4 className="text-green-400 font-semibold text-sm">✅ Frontend Đã Đổ Vào Khung Đánh Dấu</h4>
-              <p className="text-slate-400 text-xs">Giao diện chỉ hiển thị sau khi Database xác thực phiên</p>
-            </div>
-          </div>
-        </div>
-
         {/* Instructions */}
         <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-6">
-          <h4 className="text-white font-semibold mb-4">Luồng đánh dấu phiên</h4>
+          <h4 className="text-white font-semibold mb-4">Luồng chữ ký thời gian</h4>
           <ul className="space-y-2 text-slate-400 text-sm">
-            <li className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs font-bold">✓</span>
-              Phiên đã được đánh dấu trong Database
-            </li>
             <li className="flex items-center gap-2">
               <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">1</span>
               Chọn thời gian → Cố định URL với chữ ký thời gian
@@ -284,6 +208,10 @@ function TimeSelectionPage() {
             </li>
             <li className="flex items-center gap-2">
               <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">3</span>
+              F5 vẫn giữ nguyên URL, không tạo mới
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">4</span>
               Hoàn thành vượt link → "Đúc" Key mới
             </li>
           </ul>

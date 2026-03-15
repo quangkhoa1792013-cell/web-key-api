@@ -1,16 +1,58 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Clock, Key, Copy, RefreshCw, CheckCircle, ChevronLeft, Zap, Loader2, Fingerprint, AlertCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Clock, Key, Copy, CheckCircle, ChevronLeft, Zap, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 
 function KeyDisplayPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { serviceId, randomId } = useParams();
   const [keys, setKeys] = useState([]);
   const [generating, setGenerating] = useState(true);
   const [countdown, setCountdown] = useState(10);
   const [showToast, setShowToast] = useState(null);
   const [isExpired, setIsExpired] = useState(false);
-  const [deviceId, setDeviceId] = useState('');
+
+  // Check expiry every second
+  useEffect(() => {
+    const checkExpiry = () => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      // Check localStorage key
+      const savedKey = localStorage.getItem('currentKey');
+      if (savedKey) {
+        try {
+          const keyData = JSON.parse(savedKey);
+          if (keyData.expire_ts && keyData.expire_ts < currentTime) {
+            // Key expired - clear all state and redirect
+            console.log('[KeyDisplayPage] Key expired, redirecting to expired page');
+            localStorage.clear();
+            setKeys([]);
+            setGenerating(false);
+            
+            // Redirect to expired page with replace to prevent going back
+            navigate('/expired', { replace: true });
+            return;
+          }
+        } catch (e) {
+          console.error('[KeyDisplayPage] Error parsing saved key:', e);
+        }
+      }
+      
+      // Also check keys in state
+      keys.forEach(keyData => {
+        if (keyData.expire_ts && keyData.expire_ts < currentTime) {
+          console.log('[KeyDisplayPage] Key in state expired, redirecting');
+          localStorage.clear();
+          setKeys([]);
+          setGenerating(false);
+          navigate('/expired', { replace: true });
+          return;
+        }
+      });
+    };
+
+    const interval = setInterval(checkExpiry, 1000);
+    return () => clearInterval(interval);
+  }, [keys, navigate]);
 
   // Load existing key from localStorage on mount
   useEffect(() => {
@@ -18,12 +60,11 @@ function KeyDisplayPage() {
     if (savedKey) {
       try {
         const keyData = JSON.parse(savedKey);
-        const now = Date.now();
-        const expiresAt = keyData.createdAt ? new Date(keyData.createdAt).getTime() + (keyData.duration * 1000) : 0;
+        const currentTime = Math.floor(Date.now() / 1000);
         
-        if (expiresAt > now) {
+        if (keyData.expire_ts && keyData.expire_ts > currentTime) {
           // Key still valid, calculate remaining time
-          const timeLeft = Math.floor((expiresAt - now) / 1000);
+          const timeLeft = keyData.expire_ts - currentTime;
           setKeys([{ ...keyData, timeLeft }]);
           setGenerating(false);
           setCountdown(0);
@@ -54,19 +95,6 @@ function KeyDisplayPage() {
     }
   }, [generating, countdown]);
 
-  // Handle expiration - redirect to time selection
-  useEffect(() => {
-    if (isExpired) {
-      // Clear expired key
-      localStorage.removeItem('currentKey');
-      // Redirect after 3 seconds
-      const timer = setTimeout(() => {
-        navigate('/');
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [isExpired, navigate]);
-
   // Save key to localStorage whenever keys change
   useEffect(() => {
     if (keys.length > 0 && !generating) {
@@ -74,62 +102,55 @@ function KeyDisplayPage() {
     }
   }, [keys, generating]);
 
-  // Countdown timer for key expiration
+  // Handle expiration - redirect to expired page
   useEffect(() => {
-    if (!generating && keys.length > 0 && !isExpired) {
-      const interval = setInterval(() => {
-        setKeys(prevKeys => {
-          const updatedKeys = prevKeys.map(key => {
-            const newTimeLeft = Math.max(0, key.timeLeft - 1);
-            if (newTimeLeft === 0 && key.timeLeft > 0) {
-              setIsExpired(true);
-            }
-            return { ...key, timeLeft: newTimeLeft };
-          });
-          return updatedKeys;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
+    if (isExpired) {
+      // Clear expired key
+      localStorage.removeItem('currentKey');
+      // Redirect immediately to expired page
+      navigate('/expired', { replace: true });
     }
-  }, [generating, keys.length, isExpired]);
+  }, [isExpired, navigate]);
 
   const generateKey = async () => {
     const selectedTime = parseInt(localStorage.getItem('selectedTime') || '4');
-    const urlParams = searchParams.toString();
+    const selectedService = localStorage.getItem('selectedService') || 'lootlab';
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
     
     try {
-      const response = await fetch('/api/create-key', {
+      const response = await fetch(`${apiBaseUrl}/api/create-key`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           duration: selectedTime * 3600,
-          deviceId: deviceId,
-          urlParams: urlParams
+          service: selectedService
         })
       });
       
       const result = await response.json();
       
       if (result.success) {
+        const currentTime = Math.floor(Date.now() / 1000);
         setKeys([{ 
           id: result.id || '1',
           key: result.key, 
           duration: result.duration,
           timeLeft: result.duration,
+          expire_ts: currentTime + result.duration,
           status: 'ACTIVE',
-          hwid: deviceId,
           createdAt: new Date().toISOString()
         }]);
       }
     } catch (error) {
-      const demoKey = `KHOA-${selectedTime}H-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+      const currentTime = Math.floor(Date.now() / 1000);
+      const demoKey = `KHOA-${selectedTime}-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
       setKeys([{ 
         id: 'demo-1',
         key: demoKey, 
         duration: selectedTime * 3600,
         timeLeft: selectedTime * 3600,
+        expire_ts: currentTime + (selectedTime * 3600),
         status: 'ACTIVE',
-        hwid: deviceId,
         createdAt: new Date().toISOString()
       }]);
     } finally {
@@ -300,18 +321,11 @@ function KeyDisplayPage() {
                       >
                         <Copy className="w-5 h-5" />
                       </button>
-                      <button
-                        onClick={() => renewKey(keyData.id)}
-                        className="p-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors"
-                        title="Gia hạn key"
-                      >
-                        <RefreshCw className="w-5 h-5" />
-                      </button>
                     </div>
                   </div>
 
-                  {/* Status Grid - 5 cards: Time left, Duration, Status, HWID */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Status Grid - 3 cards: Time left, Duration, Status */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
                       <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
                         <Clock className="w-4 h-4" />
@@ -341,16 +355,6 @@ function KeyDisplayPage() {
                         keyData.status === 'ACTIVE' ? 'text-green-400' : 'text-red-400'
                       }`}>
                         {keyData.status === 'ACTIVE' ? 'Hoạt động' : 'Hết hạn'}
-                      </p>
-                    </div>
-
-                    <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
-                      <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
-                        <Fingerprint className="w-4 h-4" />
-                        <span>HWID</span>
-                      </div>
-                      <p className="text-sm font-mono text-slate-300 truncate" title={keyData.hwid}>
-                        {keyData.hwid || deviceId}
                       </p>
                     </div>
                   </div>

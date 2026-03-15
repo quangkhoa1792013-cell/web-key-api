@@ -14,18 +14,17 @@ function LinkSkipPage() {
   
   const [sessionInfo, setSessionInfo] = useState(null);
   const [isValidatingSession, setIsValidatingSession] = useState(true);
-  const [validationError, setValidationError] = useState(null);
   const [currentLinkIndex, setCurrentLinkIndex] = useState(0);
   const [completedLinks, setCompletedLinks] = useState([]);
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [links, setLinks] = useState([]);
 
-  // BẢO MẬT NẠP FRONTEND - Validate session marking TRƯỚC KHI render
+  // VALIDATE SESSION MARKING before showing frontend
   useEffect(() => {
     const validateSessionMarking = async () => {
       if (!serviceId || !randomId || !timeSignature) {
-        console.log('[LinkSkip] ❌ Invalid URL format, redirecting to home');
+        console.log('[LinkSkip] Invalid URL format, redirecting to home');
         navigate('/');
         return;
       }
@@ -41,8 +40,8 @@ function LinkSkipPage() {
         const result = await response.json();
         
         if (result.success && result.exists) {
-          // Session exists in database - CHO PHÉP frontend render
-          console.log(`[LinkSkip] ✅ Session validated: ${serviceId}-${randomId}`);
+          // Session exists in database - ALLOW frontend to render
+          console.log(`[LinkSkip] Session validated: ${serviceId}-${randomId}`);
           setSessionInfo({
             service: result.service,
             status: result.status,
@@ -53,22 +52,14 @@ function LinkSkipPage() {
           // Initialize links based on time signature
           initializeLinks(timeSignature);
         } else {
-          // Session NOT found in database - ĐÁ VĂNG về home
-          console.log(`[LinkSkip] ❌ Session not found in DB: ${serviceId}-${randomId}`);
-          console.log('[LinkSkip] 🚫 User tried to access unmarked URL - redirecting to home');
-          setValidationError('Phiên không hợp lệ hoặc đã hết hạn');
-          
-          // Delay redirect để user thấy thông báo
-          setTimeout(() => {
-            navigate('/');
-          }, 2000);
+          // Session NOT found in database - KICK OUT to home
+          console.log(`[LinkSkip] Session not found in DB: ${serviceId}-${randomId}`);
+          console.log('[LinkSkip] User tried to access unmarked URL - redirecting to home');
+          navigate('/');
         }
       } catch (error) {
-        console.error('[LinkSkip] ❌ Session validation failed:', error);
-        setValidationError('Lỗi kết nối đến server');
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
+        console.error('[LinkSkip] Session validation failed:', error);
+        navigate('/');
       } finally {
         setIsValidatingSession(false);
       }
@@ -142,35 +133,23 @@ function LinkSkipPage() {
   if (isValidatingSession) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <Loader2 className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-white mb-3">Đang kiểm tra phiên...</h2>
-          <p className="text-slate-400 mb-4">Xác thực đánh dấu trong Database</p>
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-            <div className="flex items-center justify-center gap-2">
-              <Shield className="w-5 h-5 text-blue-400" />
-              <p className="text-blue-400 text-sm">Bảo mật: Chỉ cho phép truy cập các phiên đã được đánh dấu</p>
-            </div>
-          </div>
+        <div className="text-center">
+          <Loader2 className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white mb-2">Đang kiểm tra phiên...</p>
+          <p className="text-slate-400 text-sm">Xác thực đánh dấu trong Database</p>
         </div>
       </div>
     );
   }
 
-  // Show error if session not found (will redirect automatically)
-  if (validationError || !sessionInfo) {
+  // Show error if session not found (should redirect automatically)
+  if (!sessionInfo) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-white mb-3">Phiên không hợp lệ</h2>
-          <p className="text-slate-400 mb-6">{validationError || 'URL không được đánh dấu trong Database'}</p>
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-              <p className="text-red-400 text-sm">Bạn sẽ được chuyển về trang chủ trong giây lát...</p>
-            </div>
-          </div>
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Phiên không hợp lệ</h2>
+          <p className="text-slate-400 mb-6">URL không được đánh dấu trong Database</p>
           <button
             onClick={() => navigate('/')}
             className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
@@ -324,7 +303,7 @@ function LinkSkipPage() {
           <div className="flex items-center gap-3">
             <Shield className="w-5 h-5 text-green-400" />
             <div>
-              <h4 className="text-green-400 font-semibold text-sm">✅ Frontend Đã Đổ Vào Khung Đánh Dấu</h4>
+              <h4 className="text-green-400 font-semibold text-sm">✓ Frontend Đã Đổ Vào Khung Đánh Dấu</h4>
               <p className="text-slate-400 text-xs">Giao diện chỉ hiển thị sau khi Database xác thực phiên</p>
             </div>
           </div>

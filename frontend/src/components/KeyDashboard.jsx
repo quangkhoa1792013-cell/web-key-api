@@ -14,29 +14,60 @@ function KeyDashboard() {
     loadKeys();
   }, []);
 
+  // Check expiry every second
+  useEffect(() => {
+    const checkExpiry = () => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      keys.forEach(keyData => {
+        if (keyData.expire_ts && keyData.expire_ts < currentTime) {
+          // Key expired - clear all state and redirect
+          console.log('[KeyDashboard] Key expired, redirecting to expired page');
+          setKeys([]);
+          setStats({ total: 0, active: 0, expired: 0 });
+          localStorage.clear();
+          
+          // Redirect to expired page with replace to prevent going back
+          navigate('/expired', { replace: true });
+          return;
+        }
+      });
+    };
+
+    const interval = setInterval(checkExpiry, 1000);
+    return () => clearInterval(interval);
+  }, [keys, navigate]);
+
   const loadKeys = async () => {
     try {
+      // Use Windows-compatible path with forward slashes
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      console.log('[KeyDashboard] Loading keys from:', apiBaseUrl);
+      
       const data = await keyService.getAllKeys();
       // Backend returns { success: true, data: [...] }
       const keysData = data.data || [];
       setKeys(keysData);
       updateStats(keysData);
     } catch (error) {
-      console.error('Error loading keys:', error);
+      console.error('[KeyDashboard] Error loading keys:', error);
       // Demo data if API fails
+      const currentTime = Math.floor(Date.now() / 1000);
       const demoKeys = [
         {
           id: '1',
-          key: 'KHOA-24H-ABC123XYZ',
+          key: 'KHOA-24-ABC123XYZ123456789012345',
           status: 'ACTIVE',
           timeLeft: 72000,
+          expire_ts: currentTime + 72000,
           createdAt: new Date().toISOString(),
         },
         {
           id: '2',
-          key: 'KHOA-48H-DEF456UVW',
+          key: 'KHOA-48-DEF456UVW123456789012345',
           status: 'ACTIVE',
           timeLeft: 150000,
+          expire_ts: currentTime + 150000,
           createdAt: new Date().toISOString(),
         },
       ];
