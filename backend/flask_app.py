@@ -29,11 +29,14 @@ def log_error(error_message):
         with open('error_log.txt', 'a', encoding='utf-8') as f:
             f.write(error_entry)
     except Exception as e:
-        print(f"[LOG_ERROR] Failed to write to error_log.txt: {e}")
+        print(f"[LOG_ERROR] Failed to write to error_log.txt: {e}") 
 
 def get_database_url():
-    """Lấy DATABASE_URL từ nhiều nguồn khác nhau"""
-    # 1. Thử từ environment variable
+    """Lấy DATABASE_URL - Sử dụng trực tiếp URL của Neon"""
+    # Sử dụng trực tiếp URL của Neon để tránh lỗi trên PythonAnywhere
+    neon_url = 'postgresql://neondb_owner:npg_QYUiysc38zPX@ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
+    
+    # 1. Thử từ environment variable (ưu tiên cao nhất)
     db_url = os.environ.get('DATABASE_URL')
     if db_url:
         log_error("DATABASE_URL found in environment variables")
@@ -51,10 +54,9 @@ def get_database_url():
     except Exception as e:
         log_error(f"Error reading .env file: {e}")
     
-    # 3. Dùng LOCAL_DB_URL hardcoded (backup)
-    local_db_url = 'postgresql://neondb_owner:npg_QYUiysc38zPX@ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
-    log_error("Using LOCAL_DB_URL as fallback")
-    return local_db_url
+    # 3. Dùng Neon URL hardcoded (backup)
+    log_error("Using Neon URL as fallback")
+    return neon_url
 
 # Neon Database connection với SSL fix
 NEON_DB_URL = get_database_url()
@@ -109,7 +111,8 @@ class NeonKeySystem:
                 database=self.db_config['database'],
                 user=self.db_config['user'],
                 password=self.db_config['password'],
-                sslmode='require'  # Luôn có sslmode=require
+                sslmode='require',  # Luôn có sslmode=require
+                connect_timeout=10  # Timeout 10 giây cho PythonAnywhere
             )
             
             self.conn.autocommit = True
