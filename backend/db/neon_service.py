@@ -4,36 +4,177 @@ import json
 import time
 import secrets
 import string
+import random
+import traceback
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from flask_cors import CORS
+from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
-CORS(app)
 
-# Neon Database connection
-NEON_DB_URL = os.environ.get('NEON_DATABASE_URL', 
-    'postgresql://neondb_owner:npg_yXhAo4sZaKb5@ep-patient-pond-a1virzy2-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require')
+# Cấu hình CORS cho phép frontend localhost:5173
+CORS(app, 
+     origins=['http://localhost:5173', 'https://khoablabla.pythonanywhere.com'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'],
+     supports_credentials=True)
+
+def log_error(error_message):
+    """Ghi lỗi vào file error_log.txt"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    error_entry = f"[{timestamp}] {error_message}\n"
+    
+    try:
+        with open('error_log.txt', 'a', encoding='utf-8') as f:
+            f.write(error_entry)
+    except Exception as e:
+        print(f"[LOG_ERROR] Failed to write to error_log.txt: {e}")
+
+def get_database_url():
+    """Lấy DATABASE_URL từ nhiều nguồn khác nhau"""
+    # 1. Thử từ environment variable
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        log_error("DATABASE_URL found in environment variables")
+        return db_url
+    
+    # 2. Thử từ file .env
+    try:
+        if os.path.exists('.env'):
+            with open('.env', 'r') as f:
+                for line in f:
+                    if line.startswith('DATABASE_URL='):
+                        db_url = line.split('=', 1)[1].strip()
+                        log_error("DATABASE_URL found in .env file")
+                        return db_url
+    except Exception as e:
+        log_error(f"Error reading .env file: {e}")
+    
+    # 3. Dùng LOCAL_DB_URL hardcoded (backup)
+    local_db_url = 'postgresql://neondb_owner:npg_yXhAo4sZaKb5@ep-patient-pond-a1virzy2-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
+    log_error("Using LOCAL_DB_URL as fallback")
+    return local_db_url
+
+# Neon Database connection với SSL fix
+NEON_DB_URL = get_database_url()
 
 class NeonKeySystem:
     def __init__(self):
         self.conn = None
+        self.db_config = self.parse_database_url()
         self.connect_db()
+        self.init_tables()
     
-    def connect_db(self):
-        try:
-            self.conn = psycopg2.connect(NEON_DB_URL)
-            self.conn.autocommit = True
-            print("Connected to Neon Database")
-        except Exception as e:
-            print(f"Database connection error: {e}")
-            self.conn = None
-    
-    def execute_query(self, query, params=None):
-        if not self.conn:
-            self.connect_db()
+    def parse_database_url(self):
+        """Parse DATABASE_URL với SSL fix cho PythonAnywhere"""
+        if not NEON_DB_URL:
+            log_error("DATABASE_URL not found in any source")
+            return None
         
         try:
+            parsed = urlparse(NEON_DB_URL)
+            config = {
+                'host': parsed.hostname,
+                'port': parsed.port or 5432,
+                'database': parsed.path.lstrip('/'),
+                'user': parsed.username,
+                'password': parsed.password,
+                'sslmode': 'require'  # Hardcoded cho PythonAnywhere
+            }
+            
+            safe_config = config.copy()
+            safe_config['password'] = '***'
+            log_error(f"Database config: {safe_config}")
+            return config
+            
+        except Exception as e:
+            log_error(f"Failed to parse DATABASE_URL: {e}")
+            log_error(f"Traceback: {traceback.format_exc()}")
+            return None
+    
+    def connect_db(self):
+        """Connect to Neon Database với SSL fix"""
+        if not self.db_config:
+            log_error("No database configuration available")
+            return False
+        
+        try:
+            if self.conn:
+                self.conn.close()
+            
+            self.conn = psycopg2.connect(
+                host=self.db_config['host'],
+                port=self.db_config['port'],
+                database=self.db_config['database'],
+                user=self.db_config['user'],
+                password=self.db_config['password'],
+                sslmode='require'  # Luôn có sslmode=require
+            )
+            
+            self.conn.autocommit = True
+            
+            with self.conn.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+            
+            log_error("Database connection successful!")
+            return True
+            
+        except Exception as e:
+            log_error(f"Database connection error: {e}")
+            log_error(f"Traceback: {traceback.format_exc()}")
+            self.conn = None
+            return False
+    
+    def init_tables(self):
+        """Auto-create tables"""
+        if not self.conn:
+            log_error("Cannot create tables - no database connection")
+            return False
+        
+        try:
+            create_table_query = """
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id SERIAL PRIMARY KEY,
+                key VARCHAR(100) UNIQUE NOT NULL,
+                hwid VARCHAR(255),
+                ip_address INET,
+                cookies TEXT,
+                token VARCHAR(255),
+                service VARCHAR(50),
+                expire_ts BIGINT NOT NULL,
+                status VARCHAR(20) DEFAULT 'PENDING',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_key ON user_sessions(key);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_expire_ts ON user_sessions(expire_ts);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_hwid ON user_sessions(hwid);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_ip ON user_sessions(ip_address);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_service ON user_sessions(service);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_status ON user_sessions(status);
+            """
+            
+            with self.conn.cursor() as cursor:
+                cursor.execute(create_table_query)
+            
+            log_error("Tables initialized successfully")
+            return True
+            
+        except Exception as e:
+            log_error(f"Failed to create tables: {e}")
+            log_error(f"Traceback: {traceback.format_exc()}")
+            return False
+    
+    def execute_query(self, query, params=None):
+        """Execute query với auto-reconnect"""
+        try:
+            if not self.conn:
+                if not self.connect_db():
+                    return None
+            
             with self.conn.cursor() as cursor:
                 if params:
                     cursor.execute(query, params)
@@ -45,269 +186,305 @@ class NeonKeySystem:
                     return result
                 else:
                     return cursor.rowcount
+                    
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            log_error(f"Connection lost, attempting reconnect: {e}")
+            
+            if self.connect_db():
+                log_error("Reconnected successfully")
+                try:
+                    with self.conn.cursor() as cursor:
+                        if params:
+                            cursor.execute(query, params)
+                        else:
+                            cursor.execute(query)
+                        
+                        if query.strip().upper().startswith('SELECT') or 'RETURNING' in query.upper():
+                            result = cursor.fetchall()
+                            return result
+                        else:
+                            return cursor.rowcount
+                except Exception as retry_error:
+                    log_error(f"Query failed after reconnect: {retry_error}")
+                    log_error(f"Traceback: {traceback.format_exc()}")
+                    return None
+            else:
+                log_error("Reconnect failed")
+                return None
+                
         except Exception as e:
-            print(f"Query error: {e}")
+            log_error(f"Query error: {e}")
+            log_error(f"Query: {query[:100]}...")
+            log_error(f"Traceback: {traceback.format_exc()}")
             return None
-    
-    def create_key(self, service, duration_hours, hwid=None, ip_address=None, cookies=None):
-        """Create new key in Neon database"""
-        query = """
-        SELECT * FROM create_new_key(%s, %s, %s, %s, %s)
-        """
-        params = (service, duration_hours, hwid, ip_address, cookies)
-        
-        result = self.execute_query(query, params)
-        
-        if result and len(result) > 0:
-            row = result[0]
-            return {
-                'success': row[0],
-                'key': row[1],
-                'expire_ts': row[2],
-                'message': row[3]
-            }
-        return {'success': False, 'message': 'Database error'}
-    
-    def validate_and_bind_key(self, key, hwid, ip_address=None, cookies=None):
-        """Validate key and bind to HWID"""
-        query = """
-        SELECT * FROM validate_and_bind_key(%s, %s, %s, %s)
-        """
-        params = (key, hwid, ip_address, cookies)
-        
-        result = self.execute_query(query, params)
-        
-        if result and len(result) > 0:
-            row = result[0]
-            return {
-                'success': row[0],
-                'message': row[1],
-                'expire_ts': row[2]
-            }
-        return {'success': False, 'message': 'Database error'}
-    
-    def check_heartbeat(self, key, hwid):
-        """Check key validity for script heartbeat"""
-        query = """
-        SELECT * FROM check_heartbeat(%s, %s)
-        """
-        params = (key, hwid)
-        
-        result = self.execute_query(query, params)
-        
-        if result and len(result) > 0:
-            row = result[0]
-            return {
-                'success': row[0],
-                'message': row[1],
-                'expire_ts': row[2]
-            }
-        return {'success': False, 'message': 'Database error'}
-    
-    def get_key_info(self, key):
-        """Get detailed key information"""
-        query = """
-        SELECT * FROM get_key_info(%s)
-        """
-        params = (key,)
-        
-        result = self.execute_query(query, params)
-        
-        if result and len(result) > 0:
-            row = result[0]
-            return {
-                'key': row[0],
-                'hwid': row[1],
-                'ip_address': str(row[2]) if row[2] else None,
-                'expire_ts': row[3],
-                'service': row[4],
-                'is_valid': row[5]
-            }
-        return None
-    
-    def cleanup_expired_keys(self):
-        """Clean up expired keys"""
-        query = "SELECT cleanup_expired_keys()"
-        result = self.execute_query(query)
-        return result[0][0] if result else 0
 
 # Initialize key system
-key_system = NeonKeySystem()
+try:
+    key_system = NeonKeySystem()
+    log_error("Key system initialized successfully")
+except Exception as e:
+    log_error(f"Failed to initialize key system: {e}")
+    log_error(f"Traceback: {traceback.format_exc()}")
+    key_system = None
 
-# API Routes
-@app.route('/api/create-key', methods=['POST'])
-def create_key():
+@app.route('/api/test-db', methods=['GET'])
+def test_database():
+    """Test database connection"""
     try:
-        data = request.get_json()
-        service = data.get('service', 'lootlab')
-        duration = data.get('duration', 3600)  # seconds
-        hwid = data.get('hwid')
-        ip_address = request.remote_addr
-        cookies = json.dumps(dict(request.cookies)) if request.cookies else None
+        if not key_system:
+            return jsonify({'success': False, 'message': 'Key system not initialized'})
         
-        # Convert duration to hours
-        duration_hours = duration // 3600
+        result = key_system.execute_query("SELECT 1")
+        if not result:
+            return jsonify({'success': False, 'message': 'Database connection failed'})
         
-        result = key_system.create_key(service, duration_hours, hwid, ip_address, cookies)
+        return jsonify({'success': True, 'message': 'Database connection successful'})
         
-        if result['success']:
+    except Exception as e:
+        log_error(f"Database test error: {e}")
+        return jsonify({'success': False, 'message': f'Database test failed: {str(e)}'})
+
+@app.route('/api/check-key-status', methods=['GET'])
+def check_key_status():
+    """Check key status cho ServiceSelectionPage"""
+    try:
+        if not key_system:
+            return jsonify({'hasKey': False, 'status': 'error'})
+        
+        service = request.args.get('service', 'lootlab')
+        
+        query = """
+        SELECT COUNT(*) as count 
+        FROM user_sessions 
+        WHERE service = %s AND expire_ts > %s AND key LIKE 'KHOA-%'
+        """
+        
+        current_time = int(time.time())
+        result = key_system.execute_query(query, (service, current_time))
+        
+        if result and result[0][0] > 0:
             return jsonify({
-                'success': True,
-                'key': result['key'],
-                'duration': duration,
-                'expire_ts': result['expire_ts']
+                'hasKey': True,
+                'status': 'active',
+                'count': result[0][0]
             })
         else:
             return jsonify({
-                'success': False,
-                'message': result['message']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/api/generate-link', methods=['POST'])
-def generate_link():
-    """Generate random link for service"""
-    try:
-        data = request.get_json()
-        service = data.get('service', 'lootlab')
-        
-        # Generate random ID
-        import random
-        import string
-        random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        
-        return jsonify({
-            'success': True,
-            'serviceId': service,
-            'randomId': random_id
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/api/validate-key', methods=['POST'])
-def validate_key():
-    try:
-        data = request.get_json()
-        key = data.get('key')
-        hwid = data.get('hwid')
-        ip_address = request.remote_addr
-        cookies = json.dumps(dict(request.cookies)) if request.cookies else None
-        
-        result = key_system.validate_and_bind_key(key, hwid, ip_address, cookies)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': result['message'],
-                'expire_ts': result['expire_ts']
+                'hasKey': False,
+                'status': 'none',
+                'count': 0
             })
-        else:
-            return jsonify({
-                'success': False,
-                'message': result['message']
-            }), 400
             
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        log_error(f"Key status check error: {e}")
+        return jsonify({'hasKey': False, 'status': 'error'})
 
-@app.route('/api/heartbeat', methods=['POST'])
-def heartbeat():
-    """Script heartbeat endpoint"""
+@app.route('/api/mark-session', methods=['POST'])
+def mark_session():
+    """Mark session trước khi chuyển trang"""
     try:
+        if not key_system:
+            return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
+        
         data = request.get_json()
-        key = data.get('key')
-        hwid = data.get('hwid')
+        service_id = data.get('serviceId')
+        random_id = data.get('randomId')
+        ip_address = data.get('ipAddress', request.remote_addr)
+        user_agent = data.get('userAgent', request.headers.get('User-Agent', ''))
         
-        result = key_system.check_heartbeat(key, hwid)
+        if not service_id or not random_id:
+            return jsonify({'success': False, 'message': 'Missing serviceId or randomId'}), 400
         
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': result['message'],
-                'expire_ts': result['expire_ts']
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': result['message']
-            }), 400
-            
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/api/key-info/<key>', methods=['GET'])
-def get_key_info(key):
-    try:
-        result = key_system.get_key_info(key)
+        # Check if session already exists
+        check_query = "SELECT id FROM user_sessions WHERE key = %s"
+        result = key_system.execute_query(check_query, (random_id,))
         
         if result:
+            return jsonify({'success': False, 'message': 'Session already exists'}), 400
+        
+        # Insert session marking
+        insert_query = """
+        INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id, expire_ts
+        """
+        
+        session_expire_ts = int(time.time()) + 1800  # 30 minutes
+        
+        params = (
+            random_id,
+            service_id,
+            'PENDING',
+            ip_address,
+            session_expire_ts,
+            'PENDING_SESSION',
+            json.dumps({'ua': user_agent, 'marked_at': time.time()})
+        )
+        
+        result = key_system.execute_query(insert_query, params)
+        
+        if result:
+            session_id = result[0][0]
+            expire_ts = result[0][1]
+            
+            log_error(f"Session marked: {service_id}-{random_id} (ID: {session_id})")
+            
             return jsonify({
                 'success': True,
-                'data': result
+                'sessionId': session_id,
+                'randomId': random_id,
+                'serviceId': service_id,
+                'expireTs': expire_ts,
+                'message': 'Session marked successfully'
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to mark session'}), 500
+            
+    except Exception as e:
+        log_error(f"Session marking error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/check-session-mark', methods=['POST'])
+def check_session_mark():
+    """Check session validity"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        random_id = data.get('randomId')
+        
+        if not random_id:
+            return jsonify({'success': False, 'message': 'Missing randomId'}), 400
+        
+        check_query = """
+        SELECT service, status, expire_ts FROM user_sessions 
+        WHERE key = %s AND expire_ts > %s
+        """
+        
+        current_time = int(time.time())
+        result = key_system.execute_query(check_query, (random_id, current_time))
+        
+        if result:
+            row = result[0]
+            return jsonify({
+                'success': True,
+                'exists': True,
+                'service': row[0],
+                'status': row[1],
+                'expireTs': row[2],
+                'timeLeft': row[2] - current_time,
+                'message': 'Session found and valid'
             })
         else:
             return jsonify({
-                'success': False,
-                'message': 'Key not found'
-            }), 404
+                'success': True,
+                'exists': False,
+                'message': 'Session not found or expired'
+            })
             
     except Exception as e:
+        log_error(f"Session check error: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/cleanup', methods=['POST'])
-def cleanup_expired():
+@app.route('/api/update-session-time', methods=['POST'])
+def update_session_time():
+    """Update session với time selection"""
     try:
-        deleted_count = key_system.cleanup_expired_keys()
-        return jsonify({
-            'success': True,
-            'deleted_count': deleted_count,
-            'message': f'Cleaned up {deleted_count} expired keys'
+        if not key_system:
+            return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        service_id = data.get('serviceId')
+        random_id = data.get('randomId')
+        duration_hours = data.get('durationHours')
+        required_links = data.get('requiredLinks')
+        
+        if not all([service_id, random_id, duration_hours]):
+            return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+        
+        # Update session với time selection
+        update_query = """
+        UPDATE user_sessions 
+        SET status = 'TIME_SELECTED', 
+            expire_ts = %s,
+            cookies = %s
+        WHERE key = %s AND service = %s
+        RETURNING id, expire_ts
+        """
+        
+        new_expire_ts = int(time.time()) + (duration_hours * 3600)
+        cookies_data = json.dumps({
+            'duration_hours': duration_hours,
+            'required_links': required_links,
+            'time_selected_at': time.time()
         })
+        
+        result = key_system.execute_query(update_query, (new_expire_ts, cookies_data, random_id, service_id))
+        
+        if result:
+            session_id = result[0][0]
+            expire_ts = result[0][1]
+            
+            log_error(f"Session updated with time: {service_id}-{random_id} ({duration_hours}h)")
+            
+            return jsonify({
+                'success': True,
+                'sessionId': session_id,
+                'durationHours': duration_hours,
+                'expireTs': expire_ts,
+                'message': 'Session time updated successfully'
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Failed to update session time'}), 500
+            
     except Exception as e:
+        log_error(f"Session time update error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-# Legacy endpoints for backward compatibility
-@app.route('/api/keys', methods=['GET'])
-def get_all_keys():
+@app.route('/api/check-service-keys', methods=['GET'])
+def check_service_keys():
+    """Check if service has active keys"""
     try:
-        # Return empty for now - dashboard not used in new flow
-        return jsonify({
-            'success': True,
-            'data': []
-        })
+        if not key_system:
+            return jsonify({'hasKey': False, 'count': 0, 'nextExpiry': None})
+        
+        service = request.args.get('service', 'lootlab')
+        
+        query = """
+        SELECT COUNT(*) as count, MIN(expire_ts) as next_expiry
+        FROM user_sessions 
+        WHERE service = %s AND expire_ts > %s AND key LIKE 'KHOA-%'
+        """
+        
+        current_time = int(time.time())
+        result = key_system.execute_query(query, (service, current_time))
+        
+        if result:
+            count = result[0][0]
+            next_expiry = result[0][1]
+            
+            return jsonify({
+                'hasKey': count > 0,
+                'count': count,
+                'nextExpiry': next_expiry
+            })
+        else:
+            return jsonify({'hasKey': False, 'count': 0, 'nextExpiry': None})
+            
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        log_error(f"Service keys check error: {e}")
+        return jsonify({'hasKey': False, 'count': 0, 'nextExpiry': None})
 
-@app.route('/api/keys/<int:key_id>', methods=['PUT'])
-def update_key(key_id):
-    try:
-        # Not used in new flow
-        return jsonify({
-            'success': False,
-            'message': 'Key renewal not supported in new system'
-        }), 400
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/api/delete-key/<int:key_id>', methods=['DELETE'])
-def delete_key(key_id):
-    try:
-        # Not used in new flow
-        return jsonify({
-            'success': False,
-            'message': 'Key deletion not supported in new system'
-        }), 400
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-# Health check
 @app.route('/api/health', methods=['GET'])
 def health_check():
+    """Health check endpoint"""
     try:
-        # Test database connection
+        if not key_system:
+            return jsonify({'status': 'unhealthy', 'error': 'Key system not initialized'}), 500
+        
         result = key_system.execute_query("SELECT 1")
         db_status = "connected" if result is not None else "disconnected"
         
@@ -317,24 +494,17 @@ def health_check():
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e)
-        }), 500
+        log_error(f"Health check error: {e}")
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
+# PythonAnywhere compatible - chỉ chạy app.run() khi local
 if __name__ == '__main__':
-    # Run cleanup every hour
-    def periodic_cleanup():
-        while True:
-            try:
-                key_system.cleanup_expired_keys()
-                print("Periodic cleanup completed")
-            except Exception as e:
-                print(f"Cleanup error: {e}")
-            time.sleep(3600)  # 1 hour
+    print("[NEON] 🚀 Starting Enhanced Neon Database System...")
+    print(f"[NEON] 📊 DATABASE_URL configured: {'Yes' if NEON_DB_URL else 'No'}")
     
-    import threading
-    cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
-    cleanup_thread.start()
+    if key_system and key_system.conn:
+        print("[NEON] ✅ Database test passed - Ready to serve!")
+    else:
+        print("[NEON] ❌ Database test failed - Check configuration")
     
     app.run(host='0.0.0.0', port=5000, debug=True)
