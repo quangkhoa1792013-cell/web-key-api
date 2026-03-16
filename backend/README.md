@@ -1,3 +1,12 @@
+---
+title: Backend Key API
+emoji: 🐳
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+---
+
 # Backend - KhoaDz Script Key
 
 ## 📁 Cấu trúc thư mục
