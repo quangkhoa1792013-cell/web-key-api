@@ -90,7 +90,7 @@ class NeonKeySystem:
             log_error(f"Failed to parse Neon URL: {e}")
     
     def test_connection(self):
-        """Test kết nối Neon API với cấu trúc đúng"""
+        """Test kết nối Neon API với đầy đủ proxy"""
         try:
             url = "https://ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/sql"
             headers = {
@@ -100,14 +100,15 @@ class NeonKeySystem:
                 'query': 'SELECT 1;'
             }
             
-            # Proxy bắt buộc của PythonAnywhere Free
+            # Đầy đủ proxy của PythonAnywhere
             proxies = {
+                "http": "http://proxy.server:3128",
                 "https": "http://proxy.server:3128"
             }
             
             response = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
             if response.status_code == 200:
-                log_error("✅ Neon API connection successful with proxy!")
+                log_error("✅ Neon API connection successful with full proxy!")
                 return True
             else:
                 log_error(f"❌ Neon API failed: {response.status_code} - {response.text}")
@@ -118,7 +119,7 @@ class NeonKeySystem:
             return False
     
     def execute_query(self, query, params=None):
-        """Execute query sử dụng Neon HTTP API với cấu trúc đúng"""
+        """Execute query sử dụng Neon HTTP API với đầy đủ proxy"""
         try:
             url = "https://ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/sql"
             headers = {
@@ -138,14 +139,15 @@ class NeonKeySystem:
             else:
                 payload = {'query': query}
             
-            # Proxy bắt buộc của PythonAnywhere Free
+            # Đầy đủ proxy của PythonAnywhere
             proxies = {
+                "http": "http://proxy.server:3128",
                 "https": "http://proxy.server:3128"
             }
             
             log_error(f"NEON API QUERY: {payload['query'][:100]}...")
             
-            # Gọi API với cấu trúc đúng
+            # Gọi API với đầy đủ proxy
             response = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
             
             if response.status_code == 200:
