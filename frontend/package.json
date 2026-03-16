@@ -21,6 +21,7 @@
     "zustand": "latest"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.1",
     "@vitejs/plugin-react": "latest",
     "autoprefixer": "latest",
     "postcss": "latest",

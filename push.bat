@@ -1,20 +1,31 @@
 @echo off
-:: --- BUOC 1: Push Repo Tong (Dung tai roblox\) ---
-echo Dang push len GitHub...
+echo ==========================================
+echo    BAT DAU PUSH FULL MAX (FORCE SYNC)
+echo ==========================================
+
+:: 1. Vao folder frontend de xu ly rieng
+cd frontend
+
+echo [1/3] Dang don dep file thua...
+if exist package-lock.json del /f /q package-lock.json
+if exist .pnpm-debug.log del /f /q .pnpm-debug.log
+
+echo [2/3] Dang push Frontend len GitHub (FORCE)...
 git add .
-git commit -m "Update tong hop"
-git push origin main
+git commit -m "Update Frontend: Latest Vite + pnpm-lock (Clean)"
+:: Dung --force de ghi de moi loi rejected nãy gio
+git push origin main --force
 
-:: --- BUOC 2: Nhay vao backend de push HF ---
-:: Day chinh la cho ban can "Path" nay!
-echo Dang nhay vao folder backend...
-cd /d "%~dp0backend"
-
-echo Dang push len Hugging Face...
-git add .
-git commit -m "Update rieng backend"
-git push hf main --force
-
-:: --- BUOC 3: Quay tro lai thu muc goc ---
+echo [3/3] Dang nhay sang folder Backend...
 cd ..
-echo === DA XONG FULL MAX ===
+
+echo Dang push Backend len Hugging Face...
+:: Backend thuong khong bi lech history nen push binh thuong
+git add .
+git commit -m "Update Backend: Hugging Face sync"
+git push hf main
+
+echo ==========================================
+echo    DA XONG! NETLIFY SE TU DONG BUILD
+echo ==========================================
+pause
