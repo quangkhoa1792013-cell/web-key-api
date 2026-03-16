@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSearchParams } from 'react-router-dom';
-import { Clock, Key, Copy, CheckCircle, ChevronRight, AlertCircle, ArrowLeft, Shield, Loader2, ExternalLink } from 'lucide-react';
+import { Clock, Key, Copy, CheckCircle, ChevronRight, AlertCircle, AlertTriangle, ArrowLeft, Shield, Loader2, ExternalLink } from 'lucide-react';
 
 function LinkSkipPage() {
   const navigate = useNavigate();
   const params = useParams();
   const [searchParams] = useSearchParams();
   
-  // Parse serviceId-randomId from URL
+  // Parse serviceId-randomId-timeSignature from URL
   const urlPath = Object.values(params)[0] || '';
-  const [serviceId, randomId, timeSignature] = urlPath.split('-');
+  const pathParts = urlPath.split('/');
+  const [serviceId, randomId] = pathParts[0] ? pathParts[0].split('-') : ['', ''];
+  const timeSignature = pathParts[1] ? pathParts[1].replace('h', '') : '';
   
   const [sessionInfo, setSessionInfo] = useState(null);
   const [isValidatingSession, setIsValidatingSession] = useState(true);
@@ -196,7 +198,7 @@ function LinkSkipPage() {
     );
   }
 
-  const progress = ((completedLinks.length) / links.length) * 100;
+  const progress = links.length > 0 ? ((completedLinks.length) / links.length) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
