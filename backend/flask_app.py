@@ -82,7 +82,7 @@ class NeonKeySystem:
             parsed = urlparse(NEON_DB_URL)
             config = {
                 'host': parsed.hostname,
-                'port': parsed.port or 5432,
+                'port': parsed.port or 443,  # Sửa port 443 cho PythonAnywhere Free
                 'database': parsed.path.lstrip('/'),
                 'user': parsed.username,
                 'password': parsed.password,
