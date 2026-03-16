@@ -91,7 +91,7 @@ class NeonKeySystem:
             log_error(f"Failed to parse Neon URL: {e}")
     
     def test_connection(self):
-        """Test kết nối Neon API"""
+        """Test kết nối Neon API với proxy"""
         try:
             url = f"https://{self.neon_host}/sql"
             headers = {
@@ -103,9 +103,15 @@ class NeonKeySystem:
                 'parameters': []
             }
             
-            response = requests.post(url, json=data, headers=headers, timeout=10)
+            # Proxy bắt buộc của PythonAnywhere Free
+            proxies = {
+                "http": "http://proxy.server:3128",
+                "https": "http://proxy.server:3128"
+            }
+            
+            response = requests.post(url, json=data, headers=headers, proxies=proxies, timeout=10)
             if response.status_code == 200:
-                log_error("✅ Neon API connection successful!")
+                log_error("✅ Neon API connection successful with proxy!")
                 return True
             else:
                 log_error(f"❌ Neon API failed: {response.status_code} - {response.text}")
@@ -116,12 +122,18 @@ class NeonKeySystem:
             return False
     
     def execute_query(self, query, params=None):
-        """Execute query sử dụng Neon HTTP API"""
+        """Execute query sử dụng Neon HTTP API với proxy PythonAnywhere"""
         try:
             url = f"https://{self.neon_host}/sql"
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
                 'Content-Type': 'application/json'
+            }
+            
+            # Proxy bắt buộc của PythonAnywhere Free
+            proxies = {
+                "http": "http://proxy.server:3128",
+                "https": "http://proxy.server:3128"
             }
             
             # Xử lý parameters
@@ -139,7 +151,8 @@ class NeonKeySystem:
             
             log_error(f"NEON API QUERY: {data['query'][:100]}...")
             
-            response = requests.post(url, json=data, headers=headers, timeout=10)
+            # Gọi API với proxy
+            response = requests.post(url, json=data, headers=headers, proxies=proxies, timeout=10)
             
             if response.status_code == 200:
                 result = response.json()
