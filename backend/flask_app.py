@@ -7,6 +7,7 @@ import string
 import random
 import traceback
 import logging
+import requests
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -67,85 +68,101 @@ NEON_DB_URL = get_database_url()
 
 class NeonKeySystem:
     def __init__(self):
-        self.conn = None
-        self.db_config = self.parse_database_url()
-        self.connect_db()
+        self.api_key = None
+        self.neon_host = None
+        self.db_name = None
+        self.parse_neon_url()
+        self.test_connection()
         self.init_tables()
     
-    def parse_database_url(self):
-        """Parse DATABASE_URL với SSL fix cho PythonAnywhere"""
-        if not NEON_DB_URL:
-            log_error("DATABASE_URL not found in any source")
-            return None
-        
+    def parse_neon_url(self):
+        """Parse Neon URL để lấy thông tin API"""
         try:
-            parsed = urlparse(NEON_DB_URL)
-            config = {
-                'host': parsed.hostname,
-                'port': parsed.port or 443,  # Sửa port 443 cho PythonAnywhere Free
-                'database': parsed.path.lstrip('/'),
-                'user': parsed.username,
-                'password': parsed.password,
-                'sslmode': 'require'  # Hardcoded cho PythonAnywhere
+            neon_url = 'postgresql://neondb_owner:npg_QYUiysc38zPX@ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
+            parsed = urlparse(neon_url)
+            
+            self.api_key = parsed.password  # API Key là mật khẩu
+            self.neon_host = parsed.hostname
+            self.db_name = parsed.path.lstrip('/')
+            
+            log_error(f"NEON API CONFIG - Host: {self.neon_host}, DB: {self.db_name}")
+            
+        except Exception as e:
+            log_error(f"Failed to parse Neon URL: {e}")
+    
+    def test_connection(self):
+        """Test kết nối Neon API"""
+        try:
+            url = f"https://{self.neon_host}/sql"
+            headers = {
+                'Authorization': f'Bearer {self.api_key}',
+                'Content-Type': 'application/json'
+            }
+            data = {
+                'query': 'SELECT 1',
+                'parameters': []
             }
             
-            safe_config = config.copy()
-            safe_config['password'] = '***'
-            log_error(f"Database config: {safe_config}")
-            return config
-            
+            response = requests.post(url, json=data, headers=headers, timeout=10)
+            if response.status_code == 200:
+                log_error("✅ Neon API connection successful!")
+                return True
+            else:
+                log_error(f"❌ Neon API failed: {response.status_code} - {response.text}")
+                return False
+                
         except Exception as e:
-            log_error(f"Failed to parse DATABASE_URL: {e}")
+            log_error(f"❌ Neon API connection error: {e}")
+            return False
+    
+    def execute_query(self, query, params=None):
+        """Execute query sử dụng Neon HTTP API"""
+        try:
+            url = f"https://{self.neon_host}/sql"
+            headers = {
+                'Authorization': f'Bearer {self.api_key}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Xử lý parameters
+            if params:
+                # Replace %s với $1, $2, ... cho PostgreSQL
+                formatted_query = query
+                for i, param in enumerate(params, 1):
+                    if isinstance(param, str):
+                        formatted_query = formatted_query.replace('%s', f"'{param}'", 1)
+                    else:
+                        formatted_query = formatted_query.replace('%s', str(param), 1)
+                data = {'query': formatted_query}
+            else:
+                data = {'query': query}
+            
+            log_error(f"NEON API QUERY: {data['query'][:100]}...")
+            
+            response = requests.post(url, json=data, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                log_error(f"NEON API RESPONSE: {result}")
+                
+                # Xử lý response từ Neon API
+                if 'rows' in result:
+                    return result['rows']
+                elif 'result' in result:
+                    return result['result']
+                else:
+                    return result
+            else:
+                log_error(f"NEON API ERROR: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            log_error(f"NEON API EXECUTE ERROR: {e}")
             log_error(f"Traceback: {traceback.format_exc()}")
             return None
     
-    def connect_db(self):
-        """Connect to Neon Database với SSL fix"""
-        if not self.db_config:
-            log_error("No database configuration available")
-            return False
-        
-        try:
-            if self.conn:
-                self.conn.close()
-            
-            # Log config để debug (che mật khẩu)
-            safe_config = self.db_config.copy()
-            safe_config['password'] = '***'
-            log_error(f"DATABASE CONFIG: {safe_config}")
-            
-            self.conn = psycopg2.connect(
-                host=self.db_config['host'],
-                port=self.db_config['port'],
-                database=self.db_config['database'],
-                user=self.db_config['user'],
-                password=self.db_config['password'],
-                sslmode='require',  # Luôn có sslmode=require
-                connect_timeout=10  # Timeout 10 giây cho PythonAnywhere
-            )
-            
-            self.conn.autocommit = True
-            
-            with self.conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-            
-            log_error("Database connection successful!")
-            return True
-            
-        except Exception as e:
-            log_error(f"DATABASE CONNECTION ERROR: {e}")
-            log_error(f"CONNECTION TYPE: {type(e).__name__}")
-            log_error(f"Traceback: {traceback.format_exc()}")
-            self.conn = None
-            return False
-    
     def init_tables(self):
-        """Auto-create tables"""
-        if not self.conn:
-            log_error("Cannot create tables - no database connection")
-            return False
-        
+        """Auto-create tables sử dụng Neon API"""
         try:
             create_table_query = """
             CREATE TABLE IF NOT EXISTS user_sessions (
@@ -170,78 +187,31 @@ class NeonKeySystem:
             CREATE INDEX IF NOT EXISTS idx_user_sessions_status ON user_sessions(status);
             """
             
-            with self.conn.cursor() as cursor:
-                cursor.execute(create_table_query)
+            result = self.execute_query(create_table_query)
             
-            log_error("Tables initialized successfully")
-            return True
-            
+            if result is not None:
+                log_error("✅ Tables initialized successfully via Neon API")
+                return True
+            else:
+                log_error("❌ Failed to create tables via Neon API")
+                return False
+                
         except Exception as e:
             log_error(f"Failed to create tables: {e}")
             log_error(f"Traceback: {traceback.format_exc()}")
             return False
-    
-    def execute_query(self, query, params=None):
-        """Execute query với auto-reconnect"""
-        try:
-            if not self.conn:
-                if not self.connect_db():
-                    return None
-            
-            with self.conn.cursor() as cursor:
-                if params:
-                    cursor.execute(query, params)
-                else:
-                    cursor.execute(query)
-                
-                if query.strip().upper().startswith('SELECT') or 'RETURNING' in query.upper():
-                    result = cursor.fetchall()
-                    return result
-                else:
-                    return cursor.rowcount
-                    
-        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
-            log_error(f"Connection lost, attempting reconnect: {e}")
-            
-            if self.connect_db():
-                log_error("Reconnected successfully")
-                try:
-                    with self.conn.cursor() as cursor:
-                        if params:
-                            cursor.execute(query, params)
-                        else:
-                            cursor.execute(query)
-                        
-                        if query.strip().upper().startswith('SELECT') or 'RETURNING' in query.upper():
-                            result = cursor.fetchall()
-                            return result
-                        else:
-                            return cursor.rowcount
-                except Exception as retry_error:
-                    log_error(f"Query failed after reconnect: {retry_error}")
-                    log_error(f"Traceback: {traceback.format_exc()}")
-                    return None
-            else:
-                log_error("Reconnect failed")
-                return None
-                
-        except Exception as e:
-            log_error(f"Query error: {e}")
-            log_error(f"Query: {query[:100]}...")
-            log_error(f"Traceback: {traceback.format_exc()}")
-            return None
 
 # Initialize key system
 try:
-    log_error("=== STARTING KEY SYSTEM INITIALIZATION ===")
+    log_error("=== STARTING NEON API INITIALIZATION ===")
     log_error(f"DATABASE_URL: {NEON_DB_URL[:50]}...")
     key_system = NeonKeySystem()
-    if key_system and key_system.conn:
-        log_error("✅ Key system initialized successfully - Database connected")
+    if key_system and key_system.api_key:
+        log_error("✅ Neon API initialized successfully - Ready to execute queries")
     else:
-        log_error("❌ Key system initialized but database not connected")
+        log_error("❌ Neon API initialization failed")
 except Exception as e:
-    log_error(f"❌ Failed to initialize key system: {e}")
+    log_error(f"❌ Failed to initialize Neon API: {e}")
     log_error(f"Traceback: {traceback.format_exc()}")
     key_system = None
 
