@@ -6,10 +6,14 @@ import secrets
 import string
 import random
 import traceback
+import logging
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from urllib.parse import urlparse
+
+# Cấu hình logging để ghi vào file cụ thể
+logging.basicConfig(filename='/home/khoablabla2013/debug_db.log', level=logging.DEBUG)
 
 app = Flask(__name__)
 
