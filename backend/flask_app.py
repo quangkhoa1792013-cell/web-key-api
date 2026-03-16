@@ -7,14 +7,18 @@ import string
 import random
 import traceback
 import logging
-import requests
+import sys
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from urllib.parse import urlparse
 
-# Cấu hình logging để ghi vào file cụ thể
-logging.basicConfig(filename='/home/khoablabla2013/debug_db.log', level=logging.DEBUG)
+# Cấu hình logging để ghi ra console (sys.stdout)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
 
 app = Flask(__name__)
 
@@ -26,24 +30,10 @@ CORS(app,
      supports_credentials=True)
 
 def log_error(error_message):
-    """Ghi lỗi vào file error_log.txt"""
+    """Ghi lỗi ra console"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    error_entry = f"[{timestamp}] {error_message}\n"
-    
-    try:
-        with open('error_log.txt', 'a', encoding='utf-8') as f:
-            f.write(error_entry)
-    except Exception as e:
-        print(f"[LOG_ERROR] Failed to write to error_log.txt: {e}") 
-
-app = Flask(__name__)
-
-# Cấu hình CORS cho phép frontend localhost:5173
-CORS(app, 
-     origins=['http://localhost:5173', 'https://khoablabla2013.pythonanywhere.com'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-     allow_headers=['Content-Type', 'Authorization'],
-     supports_credentials=True)
+    print(f"[{timestamp}] {error_message}")
+    logging.error(error_message)
 
 class NeonKeySystem:
     def __init__(self):

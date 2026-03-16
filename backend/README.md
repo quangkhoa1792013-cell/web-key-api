@@ -1,3 +1,15 @@
+---
+title: Backend Key API
+emoji: 🐳
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+---
+
+# Dự án Backend cho Roblox
+Dự án này chạy Flask trên Docker.
+
 # Backend - KhoaDz Script Key
 
 ## 📁 Cấu trúc thư mục

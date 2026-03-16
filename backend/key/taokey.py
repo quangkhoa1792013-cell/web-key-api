@@ -11,6 +11,22 @@ class NeonKeySystemLogic:
         self.conn = None
         self.connect_db()
     
+    def load_conf(self):
+        """Load configuration from setting.json with relative path"""
+        try:
+            with open('key/setting.json', 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[ERROR] Failed to load config: {e}")
+            # Return default config
+            return {
+                "app_name": "KHOADZ PREMIUM SYSTEM",
+                "max_slots": 3,
+                "test_duration": 30,
+                "api_port": 5000,
+                "secret_salt": "KHOA_DZ_2026"
+            }
+    
     def connect_db(self):
         try:
             database_url = os.environ.get('DATABASE_URL', 
