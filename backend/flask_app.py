@@ -36,35 +36,14 @@ def log_error(error_message):
     except Exception as e:
         print(f"[LOG_ERROR] Failed to write to error_log.txt: {e}") 
 
-def get_database_url():
-    """Lấy DATABASE_URL - Sử dụng trực tiếp URL của Neon"""
-    # Sử dụng trực tiếp URL của Neon để tránh lỗi trên PythonAnywhere
-    neon_url = 'postgresql://neondb_owner:npg_QYUiysc38zPX@ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
-    
-    # 1. Thử từ environment variable (ưu tiên cao nhất)
-    db_url = os.environ.get('DATABASE_URL')
-    if db_url:
-        log_error("DATABASE_URL found in environment variables")
-        return db_url
-    
-    # 2. Thử từ file .env
-    try:
-        if os.path.exists('.env'):
-            with open('.env', 'r') as f:
-                for line in f:
-                    if line.startswith('DATABASE_URL='):
-                        db_url = line.split('=', 1)[1].strip()
-                        log_error("DATABASE_URL found in .env file")
-                        return db_url
-    except Exception as e:
-        log_error(f"Error reading .env file: {e}")
-    
-    # 3. Dùng Neon URL hardcoded (backup)
-    log_error("Using Neon URL as fallback")
-    return neon_url
+app = Flask(__name__)
 
-# Neon Database connection với SSL fix
-NEON_DB_URL = get_database_url()
+# Cấu hình CORS cho phép frontend localhost:5173
+CORS(app, 
+     origins=['http://localhost:5173', 'https://khoablabla2013.pythonanywhere.com'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'],
+     supports_credentials=True)
 
 class NeonKeySystem:
     def __init__(self):
@@ -74,10 +53,15 @@ class NeonKeySystem:
         self.init_tables()
     
     def parse_database_url(self):
-        """Parse DATABASE_URL để kết nối psycopg2"""
+        """Parse DATABASE_URL từ biến môi trường"""
         try:
-            neon_url = 'postgresql://neondb_owner:npg_QYUiysc38zPX@ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
-            parsed = urlparse(neon_url)
+            # Sử dụng biến môi trường DATABASE_URL
+            db_url = os.environ.get('DATABASE_URL')
+            if not db_url:
+                log_error("DATABASE_URL not found in environment variables")
+                return None
+            
+            parsed = urlparse(db_url)
             
             config = {
                 'host': parsed.hostname,
@@ -91,6 +75,7 @@ class NeonKeySystem:
             safe_config = config.copy()
             safe_config['password'] = '***'
             log_error(f"DATABASE CONFIG: {safe_config}")
+            log_error(f"DATABASE_URL from env: {db_url[:50]}...")
             return config
             
         except Exception as e:
@@ -202,7 +187,6 @@ class NeonKeySystem:
 # Initialize key system
 try:
     log_error("=== STARTING DATABASE INITIALIZATION ===")
-    log_error(f"DATABASE_URL: {NEON_DB_URL[:50]}...")
     key_system = NeonKeySystem()
     if key_system and key_system.conn:
         log_error("✅ Database connected successfully - Ready to execute queries")
