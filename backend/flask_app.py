@@ -1,4 +1,3 @@
-import psycopg2
 import os
 import json
 import time
@@ -91,25 +90,22 @@ class NeonKeySystem:
             log_error(f"Failed to parse Neon URL: {e}")
     
     def test_connection(self):
-        """Test kết nối Neon API với proxy"""
+        """Test kết nối Neon API với cấu trúc đúng"""
         try:
-            url = f"https://{self.neon_host}/sql"
+            url = "https://ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/sql"
             headers = {
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': 'application/json'
+                'Authorization': 'Bearer npg_QYUiysc38zPX'
             }
-            data = {
-                'query': 'SELECT 1',
-                'parameters': []
+            payload = {
+                'query': 'SELECT 1;'
             }
             
             # Proxy bắt buộc của PythonAnywhere Free
             proxies = {
-                "http": "http://proxy.server:3128",
                 "https": "http://proxy.server:3128"
             }
             
-            response = requests.post(url, json=data, headers=headers, proxies=proxies, timeout=10)
+            response = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
             if response.status_code == 200:
                 log_error("✅ Neon API connection successful with proxy!")
                 return True
@@ -122,37 +118,35 @@ class NeonKeySystem:
             return False
     
     def execute_query(self, query, params=None):
-        """Execute query sử dụng Neon HTTP API với proxy PythonAnywhere"""
+        """Execute query sử dụng Neon HTTP API với cấu trúc đúng"""
         try:
-            url = f"https://{self.neon_host}/sql"
+            url = "https://ep-delicate-waterfall-a19loa07-pooler.ap-southeast-1.aws.neon.tech/sql"
             headers = {
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': 'application/json'
+                'Authorization': 'Bearer npg_QYUiysc38zPX'
             }
             
-            # Proxy bắt buộc của PythonAnywhere Free
-            proxies = {
-                "http": "http://proxy.server:3128",
-                "https": "http://proxy.server:3128"
-            }
-            
-            # Xử lý parameters
+            # Xử lý parameters và format query
             if params:
-                # Replace %s với $1, $2, ... cho PostgreSQL
+                # Replace %s với giá trị thực tế
                 formatted_query = query
                 for i, param in enumerate(params, 1):
                     if isinstance(param, str):
                         formatted_query = formatted_query.replace('%s', f"'{param}'", 1)
                     else:
                         formatted_query = formatted_query.replace('%s', str(param), 1)
-                data = {'query': formatted_query}
+                payload = {'query': formatted_query}
             else:
-                data = {'query': query}
+                payload = {'query': query}
             
-            log_error(f"NEON API QUERY: {data['query'][:100]}...")
+            # Proxy bắt buộc của PythonAnywhere Free
+            proxies = {
+                "https": "http://proxy.server:3128"
+            }
             
-            # Gọi API với proxy
-            response = requests.post(url, json=data, headers=headers, proxies=proxies, timeout=10)
+            log_error(f"NEON API QUERY: {payload['query'][:100]}...")
+            
+            # Gọi API với cấu trúc đúng
+            response = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
             
             if response.status_code == 200:
                 result = response.json()
