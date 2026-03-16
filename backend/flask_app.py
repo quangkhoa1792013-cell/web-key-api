@@ -105,6 +105,11 @@ class NeonKeySystem:
             if self.conn:
                 self.conn.close()
             
+            # Log config để debug (che mật khẩu)
+            safe_config = self.db_config.copy()
+            safe_config['password'] = '***'
+            log_error(f"DATABASE CONFIG: {safe_config}")
+            
             self.conn = psycopg2.connect(
                 host=self.db_config['host'],
                 port=self.db_config['port'],
@@ -125,7 +130,8 @@ class NeonKeySystem:
             return True
             
         except Exception as e:
-            log_error(f"Database connection error: {e}")
+            log_error(f"DATABASE CONNECTION ERROR: {e}")
+            log_error(f"CONNECTION TYPE: {type(e).__name__}")
             log_error(f"Traceback: {traceback.format_exc()}")
             self.conn = None
             return False
