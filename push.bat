@@ -1,16 +1,21 @@
 @echo off
-setlocal
-title GitHub Auto-Push
-echo [1/3] Dang gom file...
+:: --- BUOC 1: Push Repo Tong (Dung tai roblox\) ---
+echo Dang push len GitHub...
 git add .
-
-:: Lay thoi gian hien tai lam commit message
-set msg=Update_%date%_%time%
-echo [2/3] Dang commit: %msg%
-git commit -m "%msg%"
-
-echo [3/3] Dang push len GitHub...
+git commit -m "Update tong hop"
 git push origin main
 
-echo.
-echo === XONG! ===
+:: --- BUOC 2: Nhay vao backend de push HF ---
+:: Day chinh la cho ban can "Path" nay!
+echo Dang nhay vao folder backend...
+cd /d "%~dp0backend"
+
+echo Dang push len Hugging Face...
+git add .
+git commit -m "Update rieng backend"
+git push hf main --force
+
+:: --- BUOC 3: Quay tro lai thu muc goc ---
+cd ..
+echo === DA XONG FULL MAX ===
+pause
