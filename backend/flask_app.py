@@ -22,9 +22,16 @@ logging.basicConfig(
 
 app = Flask(__name__)
 
-# Cấu hình CORS cho phép frontend localhost:5173
+# Cấu hình CORS cho phép frontend từ nhiều domain
 CORS(app, 
-     origins=['http://localhost:5173', 'https://khoablabla2013.pythonanywhere.com'],
+     origins=[
+         'http://localhost:5173', 
+         'http://localhost:3000',
+         'https://khoablabla2013.pythonanywhere.com',
+         'https://khoablabla-backend.hf.space',
+         'https://*.netlify.app',
+         'https://khoablabla.netlify.app'
+     ],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)

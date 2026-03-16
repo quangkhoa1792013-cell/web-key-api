@@ -18,4 +18,3 @@ git push hf main --force
 :: --- BUOC 3: Quay tro lai thu muc goc ---
 cd ..
 echo === DA XONG FULL MAX ===
-pause

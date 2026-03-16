@@ -41,7 +41,7 @@ function KeyDashboard() {
   const loadKeys = async () => {
     try {
       // Use Windows-compatible path with forward slashes
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       console.log('[KeyDashboard] Loading keys from:', apiBaseUrl);
       
       const data = await keyService.getAllKeys();

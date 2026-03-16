@@ -20,7 +20,7 @@ function ServiceSelectionPage() {
     
     try {
       // Call backend to generate link
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       const response = await fetch(`${apiBaseUrl}/api/generate-link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
