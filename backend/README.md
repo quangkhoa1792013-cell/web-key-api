@@ -1,25 +1,13 @@
 ---
-<<<<<<< HEAD
 title: Backend Key API
-=======
-title: Backend Web Key
->>>>>>> huggi   ng-face-deploy
 emoji: 🐳
 colorFrom: blue
 colorTo: green
 sdk: docker
-<<<<<<< HEAD
 app_port: 7860
----
-
-# Dự án Backend cho Roblox
-Dự án này chạy Flask trên Docker.
-
-=======
 pinned: false
 ---
 
->>>>>>> hugging-face-deploy
 # Backend - KhoaDz Script Key
 
 ## 📁 Cấu trúc thư mục
