@@ -12,7 +12,7 @@ git add .
 
 echo [2/4] Dang Commit thay doi...
 set /p msg="Nhap ghi chu cho dot push nay (hoac Enter de bo qua): "
-if "%msg%"=="" set msg="Update full project: GitHub and HF sync"
+if "%msg%"=="" set msg="push"
 git commit -m "%msg%"
 
 echo [3/4] DANG PUSH LEN GITHUB (NETLIFY)...
