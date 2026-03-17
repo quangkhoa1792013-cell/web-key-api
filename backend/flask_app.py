@@ -476,4 +476,4 @@ if __name__ == '__main__':
     else:
         print("[FLASK_APP] ❌ Database test failed - Check configuration")
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 7860)), debug=True)
