@@ -1,31 +1,33 @@
 @echo off
+setlocal
 echo ==========================================
-echo    BAT DAU PUSH FULL MAX (FORCE SYNC)
+echo     BAT DAU PUSH TONG LUC (ROOT SYNC)
 echo ==========================================
 
-:: 1. Vao folder frontend de xu ly rieng
-cd frontend
+:: Đảm bảo đang đứng ở thư mục gốc (roblox)
+cd /d "%~dp0"
 
-echo [1/3] Dang don dep file thua...
-if exist package-lock.json del /f /q package-lock.json
-if exist .pnpm-debug.log del /f /q .pnpm-debug.log
+echo [1/4] Dang don dep rac tai Frontend...
+if exist "frontend\package-lock.json" del /f /q "frontend\package-lock.json"
+if exist "frontend\.pnpm-debug.log" del /f /q "frontend\.pnpm-debug.log"
 
-echo [2/3] Dang push Frontend len GitHub (FORCE)...
+echo [2/4] Dang quet toan bo thu muc goc (Root Add)...
+:: Quan trọng: Phải add từ gốc để lấy file netlify.toml
 git add .
-git commit -m "Update Frontend: Latest Vite + pnpm-lock (Clean)"
-:: Dung --force de ghi de moi loi rejected nãy gio
+
+echo [3/4] Dang Commit toan bo du an...
+git commit -m "Final Sync: Full project structure (Frontend + Backend + Config)"
+
+echo [4/4] Dang PUSH len GitHub (Netlify)...
+:: Force push để dọn dẹp mọi xung đột cũ trên GitHub
 git push origin main --force
 
-echo [3/3] Dang nhay sang folder Backend...
-cd ..
-
-echo Dang push Backend len Hugging Face...
-:: Backend thuong khong bi lech history nen push binh thuong
-git add .
-git commit -m "Update Backend: Hugging Face sync"
-git push hf main
+echo ------------------------------------------
+echo Dang PUSH sang Hugging Face (Backend)...
+:: Đẩy code sang Space của Hugging Face
+git push hf main --force
 
 echo ==========================================
-echo    DA XONG! NETLIFY SE TU DONG BUILD
+echo    DA XONG! HAY KIEM TRA NETLIFY & HF
 echo ==========================================
 pause
