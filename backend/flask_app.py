@@ -23,6 +23,14 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # Cấu hình CORS cho phép frontend từ nhiều domain
+def is_netlify_domain(origin):
+    """Kiểm tra nếu origin là netlify domain hợp lệ"""
+    if not origin:
+        return False
+    import re
+    pattern = r'^https://[a-zA-Z0-9-]+\.netlify\.app$'
+    return re.match(pattern, origin) is not None
+
 CORS(app, 
      origins=[
          'http://localhost:5173', 
@@ -30,7 +38,7 @@ CORS(app,
          'https://khoablabla2013.pythonanywhere.com',
          'https://khoablabla-backend.hf.space',
          'https://khoablabla.netlify.app',
-         'https://*.netlify.app'
+         is_netlify_domain  # Cho phép tất cả netlify subdomains
      ],
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
@@ -57,6 +65,11 @@ class NeonKeySystem:
             if not db_url:
                 log_error("DATABASE_URL not found in environment variables")
                 return None
+            
+            # Chuyển postgres:// thành postgresql:// cho psycopg2
+            if db_url.startswith('postgres://'):
+                db_url = db_url.replace('postgres://', 'postgresql://', 1)
+                log_error(f"Converted postgres:// to postgresql:// for psycopg2 compatibility")
             
             parsed = urlparse(db_url)
             
@@ -494,7 +507,7 @@ def health_check():
 # PythonAnywhere compatible - chỉ chạy app.run() khi local
 if __name__ == '__main__':
     print("[FLASK_APP] 🚀 Starting Flask Application...")
-    print(f"[FLASK_APP] 📊 DATABASE_URL configured: {'Yes' if NEON_DB_URL else 'No'}")
+    print(f"[FLASK_APP] 📊 DATABASE_URL configured: {'Yes' if os.environ.get('DATABASE_URL') else 'No'}")
     
     if key_system and key_system.conn:
         print("[FLASK_APP] ✅ Database test passed - Ready to serve!")
