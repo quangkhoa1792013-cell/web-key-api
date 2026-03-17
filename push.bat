@@ -55,4 +55,3 @@ echo %C%==========================================================%W%
 echo %W%[*] GitHub: %B%https://github.com/quangkhoa1792013-cell/web-key-api%W%
 echo %W%[*] HF    : %P%https://huggingface.co/spaces/khoablabla/backend%W%
 echo %C%==========================================================%W%
-pause
