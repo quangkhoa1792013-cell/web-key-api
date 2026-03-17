@@ -8,5 +8,3 @@ git push origin main --force
 echo [*] Push Hugging Face...
 :: Lenh nay ep nhanh main hien tai vao nhanh main cua HF
 git push hf main --force
-
-pause
