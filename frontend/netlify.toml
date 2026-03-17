@@ -1,20 +1,22 @@
 [build]
-  base = "."
-  command = "pnpm run build"
+  # Không để dòng base ở đây nữa
+  command = "pnpm install --no-frozen-lockfile && pnpm run build"
   publish = "dist"
 
 [build.environment]
-  NETLIFY_USE_PNPM = "true"
-  PNPM_FLAGS = "--no-frozen-lockfile"
   NODE_VERSION = "18"
+  NETLIFY_USE_PNPM = "true"
 
-# SPA redirect for React Router
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Headers for security and caching
+[[redirects]]
+  from = "/api/*"
+  to = "https://khoablabla-backend.hf.space/:splat"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -23,7 +25,6 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
-# Cache static assets
 [[headers]]
   for = "/assets/*"
   [headers.values]
