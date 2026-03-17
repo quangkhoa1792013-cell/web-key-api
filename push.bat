@@ -1,19 +1,18 @@
 @echo off
-:: 1. Chuan bi quan luong
+:: 1. Ghi nhan thay doi
 git add .
-set /p msg="Nhap ghi chu: "
-if "%msg%"=="" set msg="push"
-git commit -m "%msg%"
+git commit -m "push"
 
-:: 2. Push tong len GitHub
-echo [*] Dang push GitHub...
+:: 2. Push len GitHub Main
+echo [*] Dang push GitHub MAIN...
 git push origin main --force
 
-:: 3. Push thang folder backend len Hugging Face
-echo [*] Dang push Hugging Face...
-git push backend hf main
+:: 3. Push "ruot" backend len Hugging Face Main
+echo [*] Dang push Hugging Face MAIN...
+:: Dung lenh nay de dam bao Git biet dich den la dau
+git subtree push --prefix backend https://huggingface.co/spaces/khoablabla/backend main
 
 echo ==========================================
-echo             DA PUSH XONG!
+echo           DA PUSH XONG 2 MAT TRAN!
 echo ==========================================
 pause
