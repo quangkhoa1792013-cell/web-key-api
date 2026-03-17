@@ -1,18 +1,12 @@
 @echo off
-:: 1. Ghi nhan thay doi
 git add .
 git commit -m "push"
 
-:: 2. Push len GitHub Main
-echo [*] Dang push GitHub MAIN...
+echo [*] Push GitHub...
 git push origin main --force
 
-:: 3. Push "ruot" backend len Hugging Face Main
-echo [*] Dang push Hugging Face MAIN...
-:: Dung lenh nay de dam bao Git biet dich den la dau
-git subtree push --prefix backend https://huggingface.co/spaces/khoablabla/backend main
+echo [*] Push Hugging Face...
+:: Lenh nay ep nhanh main hien tai vao nhanh main cua HF
+git push hf main --force
 
-echo ==========================================
-echo           DA PUSH XONG 2 MAT TRAN!
-echo ==========================================
 pause
