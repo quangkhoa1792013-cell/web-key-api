@@ -7,11 +7,11 @@ git commit -m "%msg%"
 
 :: 2. Push tong len GitHub
 echo [*] Dang push GitHub...
-git push origin hugging-face-deploy --force
+git push origin main --force
 
 :: 3. Push thang folder backend len Hugging Face
 echo [*] Dang push Hugging Face...
-git subtree push --prefix backend hf main
+git push backend hf main
 
 echo ==========================================
 echo             DA PUSH XONG!
