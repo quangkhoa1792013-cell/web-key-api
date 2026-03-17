@@ -1,61 +1,58 @@
 @echo off
-color 0A
-echo.
-echo +============================================================+
-echo ^|                    DEPLOYMENT SCRIPT                    ^|
-echo ^|                  GitHub + Hugging Face                  ^|
-echo +============================================================+
-echo.
+setlocal enabledelayedexpansion
 
-:: --- BUOC 1: PUSH TOAN BO DU AN LEN GITHUB (ROOT) ---
-echo [*] %time% - Dang push toan bo du an len GitHub...
+:: Dinh nghia ma mau ANSI
+set "ESC="
+set "G=%ESC%[92m"
+set "Y=%ESC%[93m"
+set "B=%ESC%[94m"
+set "P=%ESC%[95m"
+set "C=%ESC%[96m"
+set "R=%ESC%[91m"
+set "W=%ESC%[0m"
+
+cls
+echo %C%==========================================================%W%
+echo %C%            HE THONG DEPLOY TU DONG v2.0                  %W%
+echo %C%==========================================================%W%
+
+:: --- BUOC 1: GITHUB ---
+echo %Y%[*] DANG PUSH TOAN BO DU AN LEN GITHUB (ROOT)...%W%
 git add .
-git commit -m "Update project - Backend route and port config"
+git commit -m "Update project: Optimized deployment flow"
 git push origin main --force
-echo [+] %time% - GitHub push completed!
-echo.
+if %ERRORLEVEL% EQU 0 (echo %G%[OK] GitHub da cap nhat!%W%) else (echo %R%[ERR] GitHub loi!%W%)
 
-:: --- BUOC 2: CHUYEN VAO BACKEND VA SETUP GIT ---
-echo [>] %time% - Dang chuyen vao thu muc backend...
+echo.
+:: --- BUOC 2: BACKEND ---
+echo %B%[*] DI CHUYEN VAO THU MUC BACKEND...%W%
 cd backend
 
-:: Kiem tra neu chua co .git thi khoi tao
+:: --- BUOC 3: KIEM TRA GIT ---
 if not exist .git (
-    echo [!] %time% - Khoi tao Git repository trong backend...
+    echo %P%[*] Chua co Git repository tai day, dang khoi tao...%W%
     git init
     git branch -M main
     git remote add hf https://huggingface.co/spaces/khoablabla/backend
-    echo [+] %time% - Da them remote Hugging Face
 ) else (
-    echo [i] %time% - Git repository da ton tai
+    echo %G%[OK] Git Repository backend da san sang.%W%
 )
 
-:: --- BUOC 3: PUSH RIENG BACKEND LEN HUGGING FACE ---
-echo [*] %time% - Dang push backend len Hugging Face...
+echo.
+:: --- BUOC 4: HUGGING FACE ---
+echo %P%[*] DANG PUSH RIENG BACKEND LEN HUGGING FACE...%W%
 git add .
-git commit -m "Add home route and fix port 7860 for HF deployment"
+git commit -m "Deploy backend: Home route and port 7860"
 git push hf main --force
-echo [+] %time% - Hugging Face push completed!
-echo.
+if %ERRORLEVEL% EQU 0 (echo %G%[OK] Hugging Face da len den!%W%) else (echo %R%[ERR] Hugging Face loi!%W%)
 
-:: --- QUAY LAI THU MUC GOC ---
+:: --- BUOC 5: KET THUC ---
 cd ..
-
-echo +============================================================+
-echo ^|                    DEPLOYMENT SUCCESS!                   ^|
-echo +============================================================+
 echo.
-echo [G] GitHub: https://github.com/quangkhoa1792013-cell/web-key-api
-echo [H] Hugging Face: https://huggingface.co/spaces/khoablabla/backend
-echo [T] Hoan thanh luc: %time%
-echo.
-echo +============================================================+
-echo ^|                    THONG TIN DEPLOYMENT                  ^|
-echo +============================================================+
-echo ^|  * Frontend: React + Vite + Tailwind                     ^|
-echo ^|  * Backend: Flask + PostgreSQL (Neon)                   ^|
-echo ^|  * Platform: GitHub + Netlify + Hugging Face            ^|
-echo ^|  * Port: 7860 (HF) / 5173 (Local)                        ^|
-echo +============================================================+
-echo.
+echo %C%==========================================================%W%
+echo %G%             HOAN THANH DEPLOYMENT THAN TOC!              %W%
+echo %C%==========================================================%W%
+echo %W%[*] GitHub: %B%https://github.com/quangkhoa1792013-cell/web-key-api%W%
+echo %W%[*] HF    : %P%https://huggingface.co/spaces/khoablabla/backend%W%
+echo %C%==========================================================%W%
 pause
