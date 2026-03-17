@@ -1,33 +1,31 @@
 @echo off
 setlocal
 echo ==========================================
-echo     BAT DAU PUSH TONG LUC (ROOT SYNC)
+echo    TIEN CONG: GITHUB -> HUGGING FACE
 echo ==========================================
 
-:: Đảm bảo đang đứng ở thư mục gốc (roblox)
+:: Luon dung o thu muc goc roblox
 cd /d "%~dp0"
 
-echo [1/4] Dang don dep rac tai Frontend...
-if exist "frontend\package-lock.json" del /f /q "frontend\package-lock.json"
-if exist "frontend\.pnpm-debug.log" del /f /q "frontend\.pnpm-debug.log"
-
-echo [2/4] Dang quet toan bo thu muc goc (Root Add)...
-:: Quan trọng: Phải add từ gốc để lấy file netlify.toml
+echo [1/4] Dang quet toan bo file du an...
 git add .
 
-echo [3/4] Dang Commit toan bo du an...
-git commit -m "Final Sync: Full project structure (Frontend + Backend + Config)"
+echo [2/4] Dang Commit thay doi...
+set /p msg="Nhap ghi chu cho dot push nay (hoac Enter de bo qua): "
+if "%msg%"=="" set msg="Update full project: GitHub and HF sync"
+git commit -m "%msg%"
 
-echo [4/4] Dang PUSH len GitHub (Netlify)...
-:: Force push để dọn dẹp mọi xung đột cũ trên GitHub
+echo [3/4] DANG PUSH LEN GITHUB (NETLIFY)...
+:: Day len GitHub de Netlify tu build Frontend
 git push origin main --force
 
 echo ------------------------------------------
-echo Dang PUSH sang Hugging Face (Backend)...
-:: Đẩy code sang Space của Hugging Face
+echo [4/4] DANG PUSH LEN HUGGING FACE (BACKEND)...
+:: Day len Space de Hugging Face chay Backend
+:: Luu y: Phai chay lenh 'git remote add hf <link>' truoc do nhu toi da huong dan
 git push hf main --force
 
 echo ==========================================
-echo    DA XONG! HAY KIEM TRA NETLIFY & HF
+echo    HOAN THANH! KIEM TRA 2 MAT TRAN NGAY
 echo ==========================================
 pause
