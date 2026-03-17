@@ -1,29 +1,23 @@
 @echo off
 echo ==========================================
-echo       DANG TONG LUC PUSH 2 MAT TRAN
+echo           DANG PUSH THANG 2 MAT TRAN
 echo ==========================================
 
-:: 1. Chuan bi
+:: 1. Commit nhanh
 git add .
-set /p msg="Nhap ghi chu: "
-if "%msg%"=="" set msg="update"
+set /p msg="Ghi chu: "
+if "%msg%"=="" set msg="push"
 git commit -m "%msg%"
 
-:: 2. Push toan bo len GitHub (Netlify)
-echo [1/2] DANG PUSH GITHUB...
-git push origin main --force
+:: 2. Push ca du an len GitHub
+echo [1/2] GITHUB...
+git push origin hugging-face-deploy --force
 
-:: 3. Push rieng folder Backend len Hugging Face
-echo [2/2] DANG PUSH HUGGING FACE (BACKEND)...
-:: Xoa nhanh tam neu co
-git branch -D temp-deploy >nul 2>&1
-:: Tach va day
-git subtree split --prefix backend -b temp-deploy
-git push hf temp-deploy:main --force
-:: Don dep
-git branch -D temp-deploy
+:: 3. Push "ruột" folder backend lên Hugging Face
+echo [2/2] HUGGING FACE (BACKEND)...
+git subtree push --prefix backend hf main
 
 echo ==========================================
-echo             HOAN THANH!
+echo                 XONG!
 echo ==========================================
 pause
