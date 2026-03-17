@@ -23,14 +23,6 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # Cấu hình CORS cho phép frontend từ nhiều domain
-def is_netlify_domain(origin):
-    """Kiểm tra nếu origin là netlify domain hợp lệ"""
-    if not origin:
-        return False
-    import re
-    pattern = r'^https://[a-zA-Z0-9-]+\.netlify\.app$'
-    return re.match(pattern, origin) is not None
-
 CORS(app, 
      origins=[
          'http://localhost:5173', 
@@ -38,7 +30,7 @@ CORS(app,
          'https://khoablabla2013.pythonanywhere.com',
          'https://khoablabla-backend.hf.space',
          'https://khoablabla.netlify.app',
-         is_netlify_domain  # Cho phép tất cả netlify subdomains
+         r'^https://[a-zA-Z0-9-]+\.netlify\.app$'  # Regex cho tất cả netlify subdomains
      ],
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
