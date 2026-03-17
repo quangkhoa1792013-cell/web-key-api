@@ -1,6 +1,6 @@
 [build]
   base = "frontend"
-  command = "pnpm run build"
+  command = "pnpm install --no-frozen-lockfile && pnpm run build"
   publish = "dist"
 
 [build.environment]
