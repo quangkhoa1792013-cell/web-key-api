@@ -12,15 +12,15 @@ cd backend
 :: Kiem tra neu chua co Git thi khoi tao nhanh
 if not exist .git (
     git init
-    git remote add hf https://huggingface.co/spaces/khoablabla/backend
+    git remote add hf https://huggingface.co/spaces/khoablabla/backend --force
 )
 
 echo [*] Dang push rieng Backend len Hugging Face...
 git add .
-git commit -m "push backend"
-git push hf main:main --force
+git commit -m "fix conflict and push"
+:: Them --force o cuoi de xoa sach cai loi tren HF
+git push hf main --force
 
 echo ==========================================
 echo           DA HOAN THANH 2 BUOC!
 echo ==========================================
-pause
