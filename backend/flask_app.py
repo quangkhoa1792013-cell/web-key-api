@@ -22,10 +22,17 @@ logging.basicConfig(
 
 app = Flask(__name__)
 
-# Cấu hình CORS cho phép frontend localhost:5173
+# Cấu hình CORS cho phép frontend từ nhiều domain
 CORS(app, 
-     origins=['http://localhost:5173', 'https://khoablabla2013.pythonanywhere.com'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     origins=[
+         'http://localhost:5173', 
+         'http://localhost:3000',
+         'https://khoablabla2013.pythonanywhere.com',
+         'https://khoablabla-backend.hf.space',
+         'https://khoablabla.netlify.app',
+         'https://*.netlify.app'
+     ],
+     methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
 
@@ -243,66 +250,84 @@ def mark_session():
     """Mark session trước khi chuyển trang"""
     try:
         if not key_system:
-            return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
         
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid JSON data'}), 400
+            
         service_id = data.get('serviceId')
         random_id = data.get('randomId')
         ip_address = data.get('ipAddress', request.remote_addr)
         user_agent = data.get('userAgent', request.headers.get('User-Agent', ''))
         
         if not service_id or not random_id:
-            return jsonify({'success': False, 'message': 'Missing serviceId or randomId'}), 400
+            return jsonify({'success': False, 'error': 'Missing serviceId or randomId'}), 400
         
         # Check if session already exists
-        check_query = "SELECT id FROM user_sessions WHERE key = %s"
-        result = key_system.execute_query(check_query, (random_id,))
-        
-        if result:
-            return jsonify({'success': False, 'message': 'Session already exists'}), 400
+        try:
+            check_query = "SELECT id FROM user_sessions WHERE key = %s"
+            result = key_system.execute_query(check_query, (random_id,))
+            
+            if result:
+                return jsonify({'success': False, 'error': 'Session already exists'}), 400
+        except Exception as db_error:
+            log_error(f"Database check error: {db_error}")
+            return jsonify({'success': False, 'error': 'Database check failed'}), 500
         
         # Insert session marking
-        insert_query = """
-        INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id, expire_ts
-        """
-        
-        session_expire_ts = int(time.time()) + 1800  # 30 minutes
-        
-        params = (
-            random_id,
-            service_id,
-            'PENDING',
-            ip_address,
-            session_expire_ts,
-            'PENDING_SESSION',
-            json.dumps({'ua': user_agent, 'marked_at': time.time()})
-        )
-        
-        result = key_system.execute_query(insert_query, params)
-        
-        if result:
-            session_id = result[0][0]
-            expire_ts = result[0][1]
+        try:
+            insert_query = """
+            INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id, expire_ts
+            """
             
-            log_error(f"Session marked: {service_id}-{random_id} (ID: {session_id})")
+            session_expire_ts = int(time.time()) + 1800  # 30 minutes
             
-            return jsonify({
-                'success': True,
-                'sessionId': session_id,
-                'randomId': random_id,
-                'serviceId': service_id,
-                'expireTs': expire_ts,
-                'message': 'Session marked successfully'
-            })
-        else:
-            return jsonify({'success': False, 'message': 'Failed to mark session'}), 500
+            params = (
+                random_id,
+                service_id,
+                'PENDING',
+                ip_address,
+                session_expire_ts,
+                'PENDING_SESSION',
+                json.dumps({'ua': user_agent, 'marked_at': time.time()})
+            )
             
+            result = key_system.execute_query(insert_query, params)
+            
+            if result:
+                session_id = result[0][0]
+                expire_ts = result[0][1]
+                
+                log_error(f"Session marked: {service_id}-{random_id} (ID: {session_id})")
+                
+                return jsonify({
+                    'success': True,
+                    'sessionId': session_id,
+                    'randomId': random_id,
+                    'serviceId': service_id,
+                    'expireTs': expire_ts,
+                    'message': 'Session marked successfully'
+                })
+            else:
+                return jsonify({'success': False, 'error': 'Failed to mark session - database returned none'}), 500
+                
+        except Exception as db_error:
+            log_error(f"Database insert error: {db_error}")
+            return jsonify({'success': False, 'error': 'Database insert failed'}), 500
+            
+    except ValueError as ve:
+        log_error(f"Value error in mark_session: {ve}")
+        return jsonify({'success': False, 'error': f'Invalid data format: {str(ve)}'}), 400
+    except json.JSONDecodeError as je:
+        log_error(f"JSON decode error in mark_session: {je}")
+        return jsonify({'success': False, 'error': 'Invalid JSON format'}), 400
     except Exception as e:
-        log_error(f"Session marking error: {e}")
+        log_error(f"Unexpected error in mark_session: {e}")
         log_error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/check-key-status', methods=['GET'])
 def check_key_status():
@@ -383,6 +408,45 @@ def check_session_mark():
         log_error(f"Session check error: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/api/anti-cheat-check', methods=['POST'])
+def anti_cheat_check():
+    """Anti-cheat time validation"""
+    try:
+        data = request.get_json()
+        client_time = data.get('client_time', int(time.time()))
+        key = data.get('key', 'demo-key')
+        
+        server_time = int(time.time() * 1000)  # milliseconds like JavaScript
+        
+        # Skip anti-cheat in development
+        if 'localhost' in request.headers.get('Host', '') or '127.0.0.1' in request.headers.get('Host', ''):
+            return jsonify({
+                'success': True,
+                'server_time': server_time,
+                'message': 'Development mode - anti-cheat disabled'
+            })
+        
+        # Calculate time drift (allow 5 minutes tolerance)
+        time_drift = abs(client_time - server_time)
+        
+        if time_drift > 300000:  # 5 minutes in milliseconds
+            return jsonify({
+                'success': False,
+                'message': 'ANTI_CHEAT_DETECTED',
+                'server_time': server_time,
+                'drift': time_drift
+            })
+        
+        return jsonify({
+            'success': True,
+            'server_time': server_time,
+            'drift': time_drift
+        })
+        
+    except Exception as e:
+        log_error(f"Anti-cheat check error: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -412,4 +476,4 @@ if __name__ == '__main__':
     else:
         print("[FLASK_APP] ❌ Database test failed - Check configuration")
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 7860)), debug=True)

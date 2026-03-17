@@ -99,7 +99,7 @@ function KeyDisplayPage() {
     }
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       
       // Get session info from localStorage or generate new
       const randomId = localStorage.getItem('randomId') || Math.random().toString(36).substring(2, 10);

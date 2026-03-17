@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Copy, Clock, Key, Plus, Trash2, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import { keyService } from '../api/keyService';
 
 function KeyDashboard() {
   const navigate = useNavigate();
@@ -41,10 +40,11 @@ function KeyDashboard() {
   const loadKeys = async () => {
     try {
       // Use Windows-compatible path with forward slashes
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       console.log('[KeyDashboard] Loading keys from:', apiBaseUrl);
       
-      const data = await keyService.getAllKeys();
+      const response = await fetch(`${apiBaseUrl}/api/get-all-keys`);
+      const data = await response.json();
       // Backend returns { success: true, data: [...] }
       const keysData = data.data || [];
       setKeys(keysData);
@@ -101,8 +101,13 @@ function KeyDashboard() {
   };
 
   const renewKey = async (keyId) => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
     try {
-      await keyService.updateKey(keyId, { duration: 86400 }); // +24 hours
+      await fetch(`${apiBaseUrl}/api/update-key/${keyId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration: 86400 }) // +24 hours
+      });
       showNotification('Gia hạn thành công!', 'success');
       loadKeys();
     } catch (error) {
@@ -113,8 +118,11 @@ function KeyDashboard() {
   const deleteKey = async (keyId) => {
     if (!confirm('Bạn có chắc muốn xóa key này?')) return;
     
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
     try {
-      await keyService.deleteKey(keyId);
+      await fetch(`${apiBaseUrl}/api/delete-key/${keyId}`, {
+        method: 'DELETE'
+      });
       showNotification('Đã xóa key!', 'success');
       loadKeys();
     } catch (error) {

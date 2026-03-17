@@ -25,7 +25,7 @@ function TimeSelectionPage() {
       }
 
       try {
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla2013.pythonanywhere.com';
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
         const response = await fetch(`${apiBaseUrl}/api/check-session-mark`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -91,7 +91,7 @@ function TimeSelectionPage() {
 
   const updateSessionWithTime = async (hours, links) => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla2013.pythonanywhere.com';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       const response = await fetch(`${apiBaseUrl}/api/update-session-time`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

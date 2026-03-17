@@ -1,8 +1,8 @@
 # Netlify Redirects - Fix 404 when F5
 # Handle React Router routes
 
-# API routes - proxy to PythonAnywhere
-/api/*  https://khoablabla2013.pythonanywhere.com/:splat  200
+# API routes - proxy to Hugging Face
+/api/*  https://khoablabla-backend.hf.space/:splat  200
 
 # React Router routes - serve index.html
 /*    /index.html   200

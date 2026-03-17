@@ -14,7 +14,17 @@ function AntiCheatProvider({ children }) {
         const clientTime = Math.floor(Date.now() / 1000);
         
         // Get server time
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/anti-cheat-check`, {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
+        
+        // Skip anti-cheat check in development or if API fails
+        if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+          console.log('[AntiCheat] Development/Localhost mode - skipping time check');
+          setTimeDrift(0);
+          setIsTimeValid(true);
+          return;
+        }
+        
+        const response = await fetch(`${apiBaseUrl}/api/anti-cheat-check`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

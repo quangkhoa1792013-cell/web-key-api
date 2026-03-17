@@ -115,7 +115,7 @@ function KeyDisplayPage() {
   const generateKey = async () => {
     const selectedTime = parseInt(localStorage.getItem('selectedTime') || '4');
     const selectedService = localStorage.getItem('selectedService') || 'lootlab';
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
     
     try {
       const response = await fetch(`${apiBaseUrl}/api/create-key`, {
@@ -169,8 +169,9 @@ function KeyDisplayPage() {
   };
 
   const renewKey = async (keyId) => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
     try {
-      await fetch(`/api/renew-key/${keyId}`, { method: 'POST' });
+      await fetch(`${apiBaseUrl}/api/renew-key/${keyId}`, { method: 'POST' });
       setKeys(prevKeys => prevKeys.map(key => 
         key.id === keyId 
           ? { ...key, timeLeft: key.timeLeft + 86400 }

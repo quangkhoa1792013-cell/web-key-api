@@ -24,7 +24,7 @@ function ServiceSelectionPage() {
       
       for (const service of services) {
         try {
-          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
           const response = await fetch(`${apiBaseUrl}/api/check-service-keys?service=${service.id}`);
           const result = await response.json();
           
@@ -89,7 +89,7 @@ function ServiceSelectionPage() {
       const randomId = Math.random().toString(36).substring(2, 10).toLowerCase();
       
       // Call API to MARK SESSION in database FIRST
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       const response = await fetch(`${apiBaseUrl}/api/mark-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

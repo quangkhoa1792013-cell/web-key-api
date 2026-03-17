@@ -23,7 +23,7 @@ function ServiceSelectionPage() {
       
       for (const service of services) {
         try {
-          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
           const response = await fetch(`${apiBaseUrl}/api/check-service-keys?service=${service.id}`);
           const result = await response.json();
           
@@ -84,7 +84,7 @@ function ServiceSelectionPage() {
     
     try {
       // Call backend to create session with timestamp signature
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       const response = await fetch(`${apiBaseUrl}/api/create-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

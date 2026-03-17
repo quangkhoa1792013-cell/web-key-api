@@ -7,13 +7,20 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+api
+.env
+__pycache__/
+*.log
+
 .windsurf
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+backend/api
+api
+
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -24,3 +31,16 @@ dist-ssr
 *.sln
 *.sw?
 
+api
+api.txt
+api.php
+
+.env
+
+__pycache__/
+*.py[cod]
+
+*.log
+
+backend/api
+token

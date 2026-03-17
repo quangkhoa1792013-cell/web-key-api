@@ -9,5 +9,5 @@
 /:serviceId-:randomId/:time    /index.html   200
 /key    /index.html   200
 
-# API proxy (if needed)
-/api/*    https://your-backend.com/:splat    200
+# API proxy to Hugging Face
+/api/*    https://khoablabla-backend.hf.space/:splat    200

@@ -1,16 +1,19 @@
 @echo off
-setlocal
-title GitHub Auto-Push
-echo [1/3] Dang gom file...
+:: 1. Chuan bi quan luong
 git add .
-
-:: Lay thoi gian hien tai lam commit message
-set msg=Update_%date%_%time%
-echo [2/3] Dang commit: %msg%
+set /p msg="Nhap ghi chu: "
+if "%msg%"=="" set msg="push"
 git commit -m "%msg%"
 
-echo [3/3] Dang push len GitHub...
-git push origin main
+:: 2. Push tong len GitHub
+echo [*] Dang push GitHub...
+git push origin main --force
 
-echo.
-echo === XONG! ===
+:: 3. Push thang folder backend len Hugging Face
+echo [*] Dang push Hugging Face...
+git push backend hf main
+
+echo ==========================================
+echo             DA PUSH XONG!
+echo ==========================================
+pause
