@@ -7,10 +7,16 @@ ENV PATH="/home/user/.local/bin:$PATH"
 
 WORKDIR /app
 
+# Cài đặt thư viện hệ thống cho psycopg2
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy code vào server
 COPY --chown=user . .
 
-# Cài đặt thư viện
+# Cài đặt thư viện Python
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Chạy bằng Gunicorn (Chuẩn server chuyên nghiệp)
