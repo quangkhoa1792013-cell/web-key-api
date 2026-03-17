@@ -14,16 +14,13 @@
     "clsx": "latest",
     "framer-motion": "latest",
     "lucide-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "react-router-dom": "latest",
-    "tailwind-merge": "latest",
-    "zustand": "latest"
+    "react": "latest"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "latest",
+    "lightningcss": "^1.32.0",
     "postcss": "latest",
     "tailwindcss": "latest",
     "vite": "^6.4.1"
