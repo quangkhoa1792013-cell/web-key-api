@@ -1,26 +1,38 @@
 @echo off
-:: --- BUOC 1: PUSH TOAN BO LEN GITHUB (ROOT) ---
-echo [*] Dang push toan bo len GitHub...
+:: --- BUOC 1: PUSH TOAN BO DU AN LEN GITHUB (ROOT) ---
+echo [*] Dang push toan bo du an len GitHub...
 git add .
-git commit -m "push root"
+git commit -m "Update project - Backend route and port config"
 git push origin main --force
 
-:: --- BUOC 2: CHUI VAO BACKEND VA PUSH (HF) ---
-echo [*] Dang di vao folder backend...
+:: --- BUOC 2: CHUYEN VAO BACKEND VA SETUP GIT ---
+echo [*] Dang chuyen vao thu muc backend...
 cd backend
 
-:: Kiem tra neu chua co Git thi khoi tao nhanh
+:: Kiem tra neu chua co .git thi khoi tao
 if not exist .git (
+    echo [*] Khoi tao Git repository trong backend...
     git init
-    git remote add hf https://huggingface.co/spaces/khoablabla/backend --force
+    git branch -M main
+    git remote add hf https://huggingface.co/spaces/khoablabla/backend
+    echo [*] Da them remote Hugging Face
+) else (
+    echo [*] Git repository da ton tai
 )
 
-echo [*] Dang push rieng Backend len Hugging Face...
+:: --- BUOC 3: PUSH RIENG BACKEND LEN HUGGING FACE ---
+echo [*] Dang push backend len Hugging Face...
 git add .
-git commit -m "fix conflict and push"
-:: Them --force o cuoi de xoa sach cai loi tren HF
+git commit -m "Add home route and fix port 7860 for HF deployment"
 git push hf main --force
 
+:: --- QUAY LAI THU MUC GOC ---
+cd ..
+
 echo ==========================================
-echo           DA HOAN THANH 2 BUOC!
+echo           HOAN THANH DEPLOYMENT!
 echo ==========================================
+echo [*] GitHub: https://github.com/quangkhoa1792013-cell/web-key-api
+echo [*] Hugging Face: https://huggingface.co/spaces/khoablabla/backend
+echo ==========================================
+pause

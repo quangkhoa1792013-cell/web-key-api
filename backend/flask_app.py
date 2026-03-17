@@ -447,6 +447,31 @@ def anti_cheat_check():
         log_error(f"Anti-cheat check error: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/', methods=['GET'])
+def home():
+    """Trang chủ - trả về trạng thái hệ thống"""
+    try:
+        return jsonify({
+            'status': 'running',
+            'service': 'Backend Web Key API',
+            'version': '1.0.0',
+            'database': 'connected' if key_system and key_system.conn else 'disconnected',
+            'endpoints': [
+                '/api/health',
+                '/api/test-db',
+                '/api/mark-session',
+                '/api/check-key-status',
+                '/api/check-session-mark',
+                '/api/anti-cheat-check'
+            ],
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -476,4 +501,4 @@ if __name__ == '__main__':
     else:
         print("[FLASK_APP] ❌ Database test failed - Check configuration")
     
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 7860)), debug=True)
+    app.run(host='0.0.0.0', port=7860, debug=True)
