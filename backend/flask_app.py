@@ -515,3 +515,5 @@ if __name__ == '__main__':
         print("[FLASK_APP] ❌ Database test failed - Check configuration")
     
     app.run(host='0.0.0.0', port=7860, debug=True)
+
+# Force rebuild comment - Line added for Hugging Face rebuild
