@@ -18,7 +18,7 @@ if not exist .git (
 echo [*] Dang push rieng Backend len Hugging Face...
 git add .
 git commit -m "push backend"
-git push hf master:main --force
+git push hf main:main --force
 
 echo ==========================================
 echo           DA HOAN THANH 2 BUOC!
