@@ -9,6 +9,7 @@ function KeyDashboard() {
   const [loading, setLoading] = useState(true);
   const [showToast, setShowToast] = useState(null);
   const [stats, setStats] = useState({ total: 0, active: 0, expired: 0 });
+  const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
     loadKeys();
@@ -20,9 +21,11 @@ function KeyDashboard() {
       const currentTime = Math.floor(Date.now() / 1000);
       
       keys.forEach(keyData => {
+        // Only check expiry if we have a valid key with expiry timestamp
         if (keyData.expire_ts && keyData.expire_ts < currentTime) {
-          // Key expired - clear all state and redirect
-          console.log('[KeyDashboard] Key expired, redirecting to expired page');
+          // Key expired - clear all state and set expired flag
+          console.log('[KeyDashboard] Key expired, setting expired flag');
+          setIsExpired(true);
           setKeys([]);
           setStats({ total: 0, active: 0, expired: 0 });
           localStorage.clear();
@@ -40,6 +43,9 @@ function KeyDashboard() {
 
   const loadKeys = async () => {
     try {
+      // Reset expired state when loading keys
+      setIsExpired(false);
+      
       // Use Windows-compatible path with forward slashes
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       console.log('[KeyDashboard] Loading keys from:', apiBaseUrl);
@@ -215,7 +221,9 @@ function KeyDashboard() {
           {keys.length === 0 ? (
             <div className="p-12 text-center">
               <Key className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400 mb-4">Chưa có key nào</p>
+              <p className="text-slate-400 mb-4">
+                {isExpired ? 'Key đã hết hạn' : 'Chưa có key nào'}
+              </p>
               <button
                 onClick={createNewKey}
                 className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"

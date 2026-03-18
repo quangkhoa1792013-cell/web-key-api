@@ -15,7 +15,11 @@ function LinkSkipPage() {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [isValidatingSession, setIsValidatingSession] = useState(true);
   const [validationError, setValidationError] = useState(null);
-  const [currentLinkIndex, setCurrentLinkIndex] = useState(0);
+  const [currentLinkIndex, setCurrentLinkIndex] = useState(() => {
+    // Load current step from localStorage
+    const savedStep = localStorage.getItem('currentStep');
+    return savedStep ? parseInt(savedStep) : 0;
+  });
   const [completedLinks, setCompletedLinks] = useState([]);
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdown, setCountdown] = useState(10);
@@ -93,9 +97,27 @@ function LinkSkipPage() {
     }
     
     setLinks(generatedLinks);
+    
+    // Restore current step from localStorage if exists and is valid
+    const savedStep = localStorage.getItem('currentStep');
+    if (savedStep) {
+      const stepIndex = parseInt(savedStep);
+      if (stepIndex >= 0 && stepIndex < linkCount) {
+        // Restore completed links up to current step
+        const completed = [];
+        for (let i = 0; i < stepIndex; i++) {
+          completed.push(i);
+        }
+        setCompletedLinks(completed);
+        setCurrentLinkIndex(stepIndex);
+      }
+    }
   };
 
   const handleLinkClick = (linkIndex) => {
+    // Save current step to localStorage
+    localStorage.setItem('currentStep', linkIndex.toString());
+    
     // Open link in new tab
     const link = links[linkIndex];
     window.open(link.url, '_blank');
@@ -129,6 +151,9 @@ function LinkSkipPage() {
   };
 
   const finalizeKey = () => {
+    // Clear current step from localStorage when finalizing
+    localStorage.removeItem('currentStep');
+    
     // Generate random key and redirect
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     const randomPart = Array.from({length: 25}, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
@@ -308,7 +333,7 @@ function LinkSkipPage() {
                   ) : index === currentLinkIndex ? (
                     <>
                       <ExternalLink className="w-5 h-5" />
-                      Vượt Link
+                      Vượt Link {index + 1}
                     </>
                   ) : (
                     'Chờ'

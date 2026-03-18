@@ -170,14 +170,28 @@ class NeonKeySystem:
             
             with self.conn.cursor() as cursor:
                 if params:
+                    # Ensure params is always a tuple for psycopg2
+                    if not isinstance(params, tuple):
+                        params = tuple(params) if isinstance(params, (list, tuple)) else (params,)
+                    print(f"DEBUG: Executing query with params: {params}")
+                    print(f"DEBUG: Query: {query}")
+                    print(f"DEBUG: Params type: {type(params)}, length: {len(params)}")
+                    print(f"DEBUG: Number of %s in query: {query.count('%s')}")
                     cursor.execute(query, params)
                 else:
+                    print(f"DEBUG: Executing query without params")
+                    print(f"DEBUG: Query: {query}")
                     cursor.execute(query)
                 
                 if query.strip().upper().startswith('SELECT') or 'RETURNING' in query.upper():
                     result = cursor.fetchall()
+                    print(f"DEBUG: Query returned {len(result) if result else 0} rows")
+                    if result:
+                        for i, row in enumerate(result):
+                            print(f"DEBUG: Row {i}: {row}")
                     return result
                 else:
+                    print(f"DEBUG: Query affected {cursor.rowcount} rows")
                     return cursor.rowcount
                     
         except Exception as e:
@@ -226,25 +240,39 @@ def check_service_keys():
         service = request.args.get('service', 'lootlab')
         
         query = """
-        SELECT COUNT(*) as count, MIN(expire_ts) as next_expiry
+        SELECT COUNT(*) as count
         FROM user_sessions 
         WHERE service = %s AND expire_ts > %s AND key LIKE 'KHOA-%'
         """
         
         current_time = int(time.time())
+        print(f"DEBUG: Service keys query params: {(service, current_time)}")
+        print(f"DEBUG: Number of params: {len((service, current_time))}")
+        print(f"DEBUG: Number of %s in query: {query.count('%s')}")
+        
         result = key_system.execute_query(query, (service, current_time))
         
-        if result:
-            count = result[0][0]
-            next_expiry = result[0][1]
+        print(f"DEBUG: Query result: {result}")
+        
+        if result and len(result) > 0:
+            row = result[0]
+            count = row[0] if len(row) > 0 else 0
+            
+            print(f"DEBUG: Row data: {row}")
+            print(f"DEBUG: Count extracted: {count}")
             
             return jsonify({
                 'hasKey': count > 0,
                 'count': count,
-                'nextExpiry': next_expiry
+                'nextExpiry': None
             })
         else:
-            return jsonify({'hasKey': False, 'count': 0, 'nextExpiry': None})
+            print(f"DEBUG: No results returned")
+            return jsonify({
+                'hasKey': False,
+                'count': 0,
+                'nextExpiry': None
+            })
             
     except Exception as e:
         log_error(f"Service keys check error: {e}")
@@ -272,6 +300,11 @@ def mark_session():
         # Check if session already exists
         try:
             check_query = "SELECT id FROM user_sessions WHERE key = %s"
+            print(f"DEBUG: Check query: {check_query}")
+            print(f"DEBUG: Check params: {(random_id,)}")
+            print(f"DEBUG: Number of params: {len((random_id,))}")
+            print(f"DEBUG: Number of %s in query: {check_query.count('%s')}")
+            
             result = key_system.execute_query(check_query, (random_id,))
             
             if result:
@@ -300,11 +333,20 @@ def mark_session():
                 json.dumps({'ua': user_agent, 'marked_at': time.time()})
             )
             
+            print(f"DEBUG: Insert query: {insert_query}")
+            print(f"DEBUG: Insert params: {params}")
+            print(f"DEBUG: Number of params: {len(params)}")
+            print(f"DEBUG: Number of %s in query: {insert_query.count('%s')}")
+            
             result = key_system.execute_query(insert_query, params)
+            
+            print(f"DEBUG: Insert result: {result}")
             
             if result:
                 session_id = result[0][0]
                 expire_ts = result[0][1]
+                
+                print(f"DEBUG: Session ID: {session_id}, Expire TS: {expire_ts}")
                 
                 log_error(f"Session marked: {service_id}-{random_id} (ID: {session_id})")
                 
@@ -317,6 +359,7 @@ def mark_session():
                     'message': 'Session marked successfully'
                 })
             else:
+                print(f"DEBUG: Insert failed - no result returned")
                 return jsonify({'success': False, 'error': 'Failed to mark session - database returned none'}), 500
                 
         except Exception as db_error:
@@ -351,9 +394,13 @@ def check_key_status():
         """
         
         current_time = int(time.time())
+        print(f"DEBUG: Status query params: {(service, current_time)}")
+        print(f"DEBUG: Number of params: {len((service, current_time))}")
+        print(f"DEBUG: Number of %s in query: {query.count('%s')}")
+        
         result = key_system.execute_query(query, (service, current_time))
         
-        if result and result[0][0] > 0:
+        if result and len(result) > 0 and result[0][0] > 0:
             return jsonify({
                 'hasKey': True,
                 'status': 'active',
@@ -362,7 +409,7 @@ def check_key_status():
         else:
             return jsonify({
                 'hasKey': False,
-                'status': 'none',
+                'status': 'inactive',
                 'count': 0
             })
             
@@ -389,10 +436,18 @@ def check_session_mark():
         """
         
         current_time = int(time.time())
+        print(f"DEBUG: Check session query: {check_query}")
+        print(f"DEBUG: Check session params: {(random_id, current_time)}")
+        print(f"DEBUG: Number of params: {len((random_id, current_time))}")
+        print(f"DEBUG: Number of %s in query: {check_query.count('%s')}")
+        
         result = key_system.execute_query(check_query, (random_id, current_time))
+        
+        print(f"DEBUG: Check session result: {result}")
         
         if result:
             row = result[0]
+            print(f"DEBUG: Session row data: {row}")
             return jsonify({
                 'success': True,
                 'exists': True,
@@ -403,6 +458,7 @@ def check_session_mark():
                 'message': 'Session found and valid'
             })
         else:
+            print(f"DEBUG: No session found")
             return jsonify({
                 'success': True,
                 'exists': False,

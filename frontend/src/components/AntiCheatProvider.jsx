@@ -12,6 +12,13 @@ function AntiCheatProvider({ children }) {
     const checkTimeDrift = async () => {
       try {
         const clientTime = Math.floor(Date.now() / 1000);
+        const currentKey = localStorage.getItem('currentKey');
+        
+        // Only check anti-cheat if we have a valid key
+        if (!currentKey || currentKey === 'demo-key') {
+          // No valid key, skip anti-cheat check
+          return;
+        }
         
         // Get server time
         const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/anti-cheat-check`, {
@@ -21,7 +28,7 @@ function AntiCheatProvider({ children }) {
           },
           body: JSON.stringify({
             client_time: clientTime,
-            key: localStorage.getItem('currentKey') || 'demo-key'
+            key: currentKey
           })
         });
 

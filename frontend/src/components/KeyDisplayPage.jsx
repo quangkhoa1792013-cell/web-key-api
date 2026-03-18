@@ -21,6 +21,7 @@ function KeyDisplayPage() {
       if (savedKey) {
         try {
           const keyData = JSON.parse(savedKey);
+          // Only check expiry if we have a valid key with expiry timestamp
           if (keyData.expire_ts && keyData.expire_ts < currentTime) {
             // Key expired - clear all state and redirect
             console.log('[KeyDisplayPage] Key expired, redirecting to expired page');
@@ -39,6 +40,7 @@ function KeyDisplayPage() {
       
       // Also check keys in state
       keys.forEach(keyData => {
+        // Only check expiry if we have a valid key with expiry timestamp
         if (keyData.expire_ts && keyData.expire_ts < currentTime) {
           console.log('[KeyDisplayPage] Key in state expired, redirecting');
           localStorage.clear();
@@ -68,14 +70,22 @@ function KeyDisplayPage() {
           setKeys([{ ...keyData, timeLeft }]);
           setGenerating(false);
           setCountdown(0);
-        } else {
+        } else if (keyData.expire_ts && keyData.expire_ts <= currentTime) {
           // Key expired, clear it
           localStorage.removeItem('currentKey');
           setIsExpired(true);
+        } else {
+          // Key has no expiry info, treat as no key
+          localStorage.removeItem('currentKey');
+          setGenerating(true);
         }
       } catch (e) {
         localStorage.removeItem('currentKey');
+        setGenerating(true);
       }
+    } else {
+      // No key in localStorage, set to generating state
+      setGenerating(true);
     }
   }, []);
 
