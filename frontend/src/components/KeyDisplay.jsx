@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Copy, Clock, AlertTriangle, RefreshCw, Shield, ArrowLeft } from 'lucide-react';
+import api from '../api/axios';
 
 function KeyDisplay() {
   const { id } = useParams();
@@ -20,40 +21,31 @@ function KeyDisplay() {
       console.log('[KeyDisplay] Fetching key for ID:', id);
       
       try {
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
-        const url = `${apiBaseUrl}/api/get-key?id=${id}`;
-        console.log('[KeyDisplay] Full API URL:', url);
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
+        const url = `/api/get-key?id=${id}`;
+        console.log('[KeyDisplay] Full API URL:', apiBaseUrl + url);
         
-        const response = await fetch(url);
+        const response = await api.get(url);
         console.log('[KeyDisplay] Response status:', response.status);
-        console.log('[KeyDisplay] Response ok:', response.ok);
+        console.log('[KeyDisplay] Response data:', response.data);
         
-        if (response.ok) {
-          const data = await response.json();
-          console.log('[KeyDisplay] Response data:', data);
+        if (response.data && response.data.success && response.data.key) {
+          setKeyData(response.data.key);
           
-          if (data.success && data.key) {
-            setKeyData(data.key);
-            
-            // Calculate initial time left
-            const currentTime = Math.floor(Date.now() / 1000);
-            const initialTimeLeft = Math.max(0, data.key.expire_ts - currentTime);
-            setTimeLeft(initialTimeLeft);
-            setIsExpired(initialTimeLeft <= 0);
-            
-            console.log('[KeyDisplay] ✅ Key loaded successfully:', data.key);
-            console.log('[KeyDisplay] Current timestamp:', currentTime);
-            console.log('[KeyDisplay] Key expire timestamp:', data.key.expire_ts);
-            console.log('[KeyDisplay] Initial time left (seconds):', initialTimeLeft);
-            console.log('[KeyDisplay] Initial time left (formatted):', formatTime(initialTimeLeft));
-            console.log('[KeyDisplay] Is expired initially:', initialTimeLeft <= 0);
-          } else {
-            console.log('[KeyDisplay] ❌ Key not found in response');
-            setKeyData(null);
-            setIsExpired(true);
-          }
+          // Calculate initial time left
+          const currentTime = Math.floor(Date.now() / 1000);
+          const initialTimeLeft = Math.max(0, response.data.key.expire_ts - currentTime);
+          setTimeLeft(initialTimeLeft);
+          setIsExpired(initialTimeLeft <= 0);
+          
+          console.log('[KeyDisplay] ✅ Key loaded successfully:', response.data.key);
+          console.log('[KeyDisplay] Current timestamp:', currentTime);
+          console.log('[KeyDisplay] Key expire timestamp:', response.data.key.expire_ts);
+          console.log('[KeyDisplay] Initial time left (seconds):', initialTimeLeft);
+          console.log('[KeyDisplay] Initial time left (formatted):', formatTime(initialTimeLeft));
+          console.log('[KeyDisplay] Is expired initially:', initialTimeLeft <= 0);
         } else {
-          console.error('[KeyDisplay] ❌ Failed to fetch key - Status:', response.status);
+          console.log('[KeyDisplay] ❌ Key not found in response');
           setKeyData(null);
           setIsExpired(true);
         }
@@ -92,13 +84,45 @@ function KeyDisplay() {
       
       if (newTimeLeft <= 0) {
         console.log('[KeyDisplay] 🚨 COUNTDOWN REACHED ZERO!');
-        console.log('[KeyDisplay] Activating expired state...');
-        setIsExpired(true);
+        console.log('[KeyDisplay] 🔴 KEY EXPIRED - CHANGING COLOR TO RED');
+        console.log('[KeyDisplay] 🔴 MAKING KEY OPACITY LOW');
+        console.log('[KeyDisplay] 🗑️ AUTO-DELETING SESSION...');
+        
+        // Auto-delete session when countdown reaches zero
+        const autoDeleteSession = async () => {
+          try {
+            console.log('[KeyDisplay] 🛰️ Sending auto-delete request...');
+            const deleteResponse = await api.delete(`/api/session/${id}`, {
+              data: {
+                sessionId: id,
+                hwid: keyData?.hwid || 'AUTO_DELETE'
+              }
+            });
+            
+            console.log('[KeyDisplay] ✅ Auto-delete response:', deleteResponse.data);
+            console.log('[KeyDisplay] 🧹 Clearing localStorage and sessionStorage...');
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // Force redirect to home
+            console.log('[KeyDisplay] 🏠 FORCE REDIRECT TO HOME');
+            window.location.href = '/';
+            
+          } catch (error) {
+            console.error('[KeyDisplay] ❌ Auto-delete failed:', error);
+            // Still activate expired state and show manual delete button
+            setIsExpired(true);
+          }
+        };
+        
+        // Execute auto-delete immediately
+        autoDeleteSession();
         clearInterval(interval);
         
         // Log the exact moment of expiry
-        console.log('[KeyDisplay] EXPIRED AT:', new Date(currentTime * 1000).toISOString());
-        console.log('[KeyDisplay] === COUNTDOWN ENDED ===');
+        const expiryTime = new Date(currentTime * 1000).toLocaleString('vi-VN');
+        console.log('[KeyDisplay] ⏰ EXPIRED AT:', expiryTime);
+        console.log('[KeyDisplay] === COUNTDOWN ENDED - KEY SELF-DESTRUCTED ===');
       }
     }, 1000);
 
@@ -137,54 +161,49 @@ function KeyDisplay() {
     setDeleting(true);
     
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
-      const deleteUrl = `${apiBaseUrl}/api/delete-session`;
-      
-      console.log('[KeyDisplay] 🗑️ DELETING SESSION...');
-      console.log('[KeyDisplay] Delete API URL:', deleteUrl);
-      console.log('[KeyDisplay] Request payload:', {
-        sessionId: id,
-        hwid: keyData?.hwid || 'UNKNOWN'
-      });
-      
-      const deleteResponse = await fetch(deleteUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
+        console.log('[KeyDisplay] 🗑️ DELETING SESSION...');
+        console.log('[KeyDisplay] Delete API URL:', `/api/session/${id}`);
+        console.log('[KeyDisplay] Request payload:', {
           sessionId: id,
-          hwid: keyData?.hwid || 'UNKNOWN' 
-        })
-      });
-
-      console.log('[KeyDisplay] Delete response status:', deleteResponse.status);
-      console.log('[KeyDisplay] Delete response ok:', deleteResponse.ok);
-
-      if (deleteResponse.ok) {
-        const deleteData = await deleteResponse.json();
-        console.log('[KeyDisplay] ✅ Delete response data:', deleteData);
-        console.log('[KeyDisplay] ✅ Session deleted successfully!');
-        console.log('[Vite] API DELETE called for Session:', id);
+          hwid: keyData?.hwid || 'UNKNOWN'
+        });
         
-        // Wait a moment then redirect to home
-        console.log('[KeyDisplay] ⏳ Waiting 2 seconds before redirect...');
-        setTimeout(() => {
-          console.log('[KeyDisplay] 🏠 Redirecting to home page...');
-          navigate('/');
-        }, 2000);
-      } else {
-        const errorData = await deleteResponse.json();
-        console.error('[KeyDisplay] ❌ Delete failed:', errorData);
-        console.log('[KeyDisplay] Delete error status:', deleteResponse.status);
+        const deleteResponse = await api.delete(`/api/session/${id}`, {
+          data: {
+            sessionId: id,
+            hwid: keyData?.hwid || 'UNKNOWN'
+          }
+        });
+
+        console.log('[KeyDisplay] Delete response status:', deleteResponse.status);
+        console.log('[KeyDisplay] Delete response ok:', deleteResponse.status === 200);
+        console.log('[KeyDisplay] Delete response data:', deleteResponse.data);
+
+        if (deleteResponse.status === 200 && deleteResponse.data.success) {
+          console.log('[KeyDisplay] ✅ Session deleted successfully!');
+          console.log('[KeyDisplay] 🧹 Clearing localStorage and sessionStorage...');
+          
+          // Clear all storage
+          localStorage.clear();
+          sessionStorage.clear();
+          
+          // Wait a moment then redirect to home
+          console.log('[KeyDisplay] ⏳ Waiting 2 seconds before redirect...');
+          setTimeout(() => {
+            console.log('[KeyDisplay] 🏠 FORCE REDIRECT TO HOME');
+            window.location.href = '/';
+          }, 2000);
+        } else {
+          console.error('[KeyDisplay] ❌ Delete failed:', deleteResponse.data);
+          console.log('[KeyDisplay] Delete error status:', deleteResponse.status);
+          setDeleting(false);
+          setShowAlert(false);
+        }
+      } catch (error) {
+        console.error('[KeyDisplay] ❌ Error deleting key:', error);
         setDeleting(false);
         setShowAlert(false);
       }
-    } catch (error) {
-      console.error('[KeyDisplay] ❌ Error deleting key:', error);
-      setDeleting(false);
-      setShowAlert(false);
-    }
     
     console.log('[KeyDisplay] === GET NEW KEY PROCESS COMPLETE ===');
   };
