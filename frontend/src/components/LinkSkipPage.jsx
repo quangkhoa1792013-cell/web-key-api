@@ -314,31 +314,30 @@ function LinkSkipPage() {
                   </div>
                 </div>
                 
-                <button
-                  onClick={() => handleLinkClick(index)}
-                  disabled={completedLinks.includes(index) || index !== currentLinkIndex}
-                  className={`px-6 py-3 rounded-lg transition-colors flex items-center gap-2 ${
-                    completedLinks.includes(index)
-                      ? 'bg-green-500 text-white cursor-default'
-                      : index === currentLinkIndex
-                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                      : 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  {completedLinks.includes(index) ? (
-                    <>
-                      <CheckCircle className="w-5 h-5" />
-                      Hoàn thành
-                    </>
-                  ) : index === currentLinkIndex ? (
-                    <>
-                      <ExternalLink className="w-5 h-5" />
-                      Vượt Link {index + 1}
-                    </>
-                  ) : (
-                    'Chờ'
-                  )}
-                </button>
+                {/* Chỉ hiện nút cho link hiện tại */}
+                {index === currentLinkIndex && !completedLinks.includes(index) && (
+                  <button
+                    onClick={() => handleLinkClick(index)}
+                    className="px-6 py-3 rounded-lg transition-colors flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white"
+                  >
+                    <ExternalLink className="w-5 h-5" />
+                    Vượt Link {index + 1}
+                  </button>
+                )}
+                
+                {/* Hiển thị trạng thái cho các link khác */}
+                {index !== currentLinkIndex && (
+                  <div className="px-6 py-3 rounded-lg flex items-center gap-2 bg-slate-600 text-slate-400">
+                    {completedLinks.includes(index) ? (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        Hoàn thành
+                      </>
+                    ) : (
+                      'Chờ'
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
