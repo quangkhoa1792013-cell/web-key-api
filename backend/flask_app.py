@@ -2,14 +2,13 @@ import psycopg2
 import os
 import json
 import time
-import secrets
-import string
-import random
 import traceback
+import random
+import string
 import logging
 import sys
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 from urllib.parse import urlparse
 
@@ -189,6 +188,50 @@ class NeonKeySystem:
             log_error(f"Traceback: {traceback.format_exc()}")
             return None
 
+def auto_generate_key(service, ip_address):
+    """Tự động tạo key mới khi user chưa có key"""
+    try:
+        if not key_system:
+            return None
+        
+        # Tạo random string cho key
+        random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+        new_key = f"KHOA-{random_part}"
+        
+        # Tính thời gian hết hạn (24h từ now)
+        expire_ts = int(time.time()) + (24 * 60 * 60)
+        
+        # Insert key mới vào database
+        insert_query = """
+        INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING key
+        """
+        
+        params = (
+            new_key,
+            service,
+            'ACTIVE',
+            ip_address,
+            expire_ts,
+            'AUTO_GENERATED',
+            json.dumps({'auto_generated': True, 'created_at': datetime.now().isoformat()})
+        )
+        
+        result = key_system.execute_query(insert_query, params)
+        
+        if result and len(result) > 0:
+            created_key = result[0][0]
+            log_error(f"✅ Auto-generated key: {created_key} for service: {service}")
+            return created_key
+        else:
+            log_error(f"❌ Failed to auto-generate key for service: {service}")
+            return None
+            
+    except Exception as e:
+        log_error(f"❌ Auto-generate key error: {e}")
+        return None
+
 # Initialize key system
 try:
     log_error("=== STARTING DATABASE INITIALIZATION ===")
@@ -351,6 +394,7 @@ def check_key_status():
         service = request.args.get('service', 'lootlab')
         ip_address = request.remote_addr
         
+        # Kiểm tra key cho service cụ thể
         query = """
         SELECT COUNT(*) as count 
         FROM user_sessions 
@@ -367,11 +411,22 @@ def check_key_status():
                 'count': result[0][0]
             })
         else:
-            return jsonify({
-                'hasKey': False,
-                'status': 'inactive',
-                'count': 0
-            })
+            # Nếu không có key cho service này, tự động tạo key mới
+            auto_generated_key = auto_generate_key(service, ip_address)
+            if auto_generated_key:
+                return jsonify({
+                    'hasKey': True,
+                    'status': 'auto-generated',
+                    'count': 1,
+                    'key': auto_generated_key,
+                    'message': 'Auto-generated new key'
+                })
+            else:
+                return jsonify({
+                    'hasKey': False,
+                    'status': 'inactive',
+                    'count': 0
+                })
             
     except Exception as e:
         log_error(f"Key status check error: {e}")
