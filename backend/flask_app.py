@@ -394,43 +394,157 @@ def check_key_status():
         service = request.args.get('service', 'lootlab')
         ip_address = request.remote_addr
         
-        # Kiểm tra key cho service cụ thể
+        # Kiểm tra key cho service cụ thể - lấy thông tin chi tiết
         query = """
-        SELECT COUNT(*) as count 
+        SELECT key, expire_ts, status, service 
         FROM user_sessions 
-        WHERE service = %s AND expire_ts > %s AND key LIKE 'KHOA-%%'
+        WHERE service = %s AND key LIKE 'KHOA-%%'
+        ORDER BY expire_ts DESC
         """
         
         current_time = int(time.time())
-        result = key_system.execute_query(query, (service, current_time))
+        result = key_system.execute_query(query, (service,))
         
-        if result and len(result) > 0 and result[0][0] > 0:
+        log_error(f"DEBUG: Current time: {current_time}")
+        log_error(f"DEBUG: Query result: {result}")
+        
+        if result and len(result) > 0:
+            # Kiểm tra key còn hạn không
+            for row in result:
+                key_value = row[0]
+                expire_ts = row[1]
+                status = row[2]
+                key_service = row[3]
+                
+                log_error(f"DEBUG: Checking key: {key_value}, expire_ts: {expire_ts}, status: {status}")
+                log_error(f"DEBUG: Time comparison: {expire_ts} > {current_time} = {expire_ts > current_time}")
+                
+                # Nếu key còn hạn và status active
+                if expire_ts > current_time and status == 'ACTIVE':
+                    # Tạo session token
+                    session_token = f"session_{key_value}_{int(time.time())}"
+                    
+                    log_error(f"✅ Valid key found: {key_value}")
+                    return jsonify({
+                        'hasKey': True,
+                        'status': 'active',
+                        'key': key_value,
+                        'expireTs': expire_ts,
+                        'service': key_service,
+                        'sessionToken': session_token,
+                        'timeLeft': expire_ts - current_time,
+                        'currentTime': current_time,
+                        'message': 'Key is valid'
+                    })
+            
+            # Không có key nào hợp lệ
+            log_error(f"❌ No valid keys found for service: {service}")
             return jsonify({
-                'hasKey': True,
-                'status': 'active',
-                'count': result[0][0]
+                'hasKey': False,
+                'status': 'inactive',
+                'currentTime': current_time,
+                'message': 'No valid keys found'
             })
         else:
+            log_error(f"❌ No keys found for service: {service}")
             # Nếu không có key cho service này, tự động tạo key mới
             auto_generated_key = auto_generate_key(service, ip_address)
             if auto_generated_key:
+                session_token = f"session_{auto_generated_key}_{int(time.time())}"
                 return jsonify({
                     'hasKey': True,
                     'status': 'auto-generated',
-                    'count': 1,
                     'key': auto_generated_key,
+                    'sessionToken': session_token,
                     'message': 'Auto-generated new key'
                 })
             else:
                 return jsonify({
                     'hasKey': False,
                     'status': 'inactive',
-                    'count': 0
+                    'currentTime': current_time,
+                    'message': 'Failed to auto-generate key'
                 })
             
     except Exception as e:
         log_error(f"Key status check error: {e}")
-        return jsonify({'hasKey': False, 'status': 'error'})
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'hasKey': False, 'status': 'error', 'error': str(e)})
+
+@app.route('/api/verify-session', methods=['POST'])
+def verify_session():
+    """Verify session token"""
+    try:
+        if not key_system:
+            return jsonify({'valid': False, 'error': 'Key system not initialized'})
+        
+        data = request.get_json()
+        session_token = data.get('sessionToken')
+        
+        if not session_token:
+            return jsonify({'valid': False, 'error': 'Missing session token'})
+        
+        # Parse session token: session_{key}_{timestamp}
+        parts = session_token.split('_')
+        if len(parts) < 3 or parts[0] != 'session':
+            return jsonify({'valid': False, 'error': 'Invalid session token format'})
+        
+        key_value = parts[1]
+        timestamp = parts[2]
+        
+        # Kiểm tra key trong database
+        query = """
+        SELECT key, expire_ts, status, service 
+        FROM user_sessions 
+        WHERE key = %s
+        """
+        
+        current_time = int(time.time())
+        result = key_system.execute_query(query, (key_value,))
+        
+        log_error(f"DEBUG: Verifying session for key: {key_value}")
+        log_error(f"DEBUG: Current time: {current_time}")
+        log_error(f"DEBUG: Query result: {result}")
+        
+        if result and len(result) > 0:
+            row = result[0]
+            db_key = row[0]
+            expire_ts = row[1]
+            status = row[2]
+            service = row[3]
+            
+            log_error(f"DEBUG: Session check - expire_ts: {expire_ts}, status: {status}")
+            log_error(f"DEBUG: Time comparison: {expire_ts} > {current_time} = {expire_ts > current_time}")
+            
+            if expire_ts > current_time and status == 'ACTIVE':
+                return jsonify({
+                    'valid': True,
+                    'key': db_key,
+                    'expireTs': expire_ts,
+                    'service': service,
+                    'timeLeft': expire_ts - current_time,
+                    'currentTime': current_time,
+                    'message': 'Session is valid'
+                })
+            else:
+                return jsonify({
+                    'valid': False,
+                    'error': 'Key expired or inactive',
+                    'currentTime': current_time,
+                    'expireTs': expire_ts,
+                    'status': status
+                })
+        else:
+            return jsonify({
+                'valid': False,
+                'error': 'Key not found',
+                'currentTime': current_time
+            })
+            
+    except Exception as e:
+        log_error(f"Session verification error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'valid': False, 'error': str(e)})
 
 @app.route('/api/check-session-mark', methods=['POST'])
 def check_session_mark():

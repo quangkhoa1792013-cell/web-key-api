@@ -11,35 +11,87 @@ function KeyDashboard() {
   const [stats, setStats] = useState({ total: 0, active: 0, expired: 0 });
   const [isExpired, setIsExpired] = useState(false);
 
+  // Auto-check session on mount
   useEffect(() => {
-    loadKeys();
+    const checkExistingSession = async () => {
+      try {
+        const sessionToken = localStorage.getItem('user_session');
+        if (sessionToken) {
+          console.log('[KeyDashboard] Found existing session, verifying...');
+          
+          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
+          const response = await fetch(`${apiBaseUrl}/api/verify-session`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sessionToken })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('[KeyDashboard] Session verification response:', data);
+            
+            if (data.valid) {
+              console.log('[KeyDashboard] Session valid, loading keys...');
+              // Session valid, load keys normally
+              loadKeys();
+              return;
+            } else {
+              console.log('[KeyDashboard] Session invalid, clearing token:', data.error);
+              localStorage.removeItem('user_session');
+            }
+          } else {
+            console.log('[KeyDashboard] Session verification failed, clearing token');
+            localStorage.removeItem('user_session');
+          }
+        }
+        
+        // No valid session, load keys normally
+        loadKeys();
+      } catch (error) {
+        console.error('[KeyDashboard] Session check error:', error);
+        localStorage.removeItem('user_session');
+        loadKeys();
+      }
+    };
+    
+    checkExistingSession();
   }, []);
 
-  // Check expiry every second
   useEffect(() => {
-    const checkExpiry = () => {
-      const currentTime = Math.floor(Date.now() / 1000);
-      
-      keys.forEach(keyData => {
-        // Only check expiry if we have a valid key with expiry timestamp
-        if (keyData.expire_ts && keyData.expire_ts < currentTime) {
-          // Key expired - clear all state and set expired flag
-          console.log('[KeyDashboard] Key expired, setting expired flag');
-          setIsExpired(true);
-          setKeys([]);
-          setStats({ total: 0, active: 0, expired: 0 });
-          localStorage.clear();
-          
-          // Redirect to expired page with replace to prevent going back
-          navigate('/expired', { replace: true });
-          return;
-        }
-      });
-    };
-
-    const interval = setInterval(checkExpiry, 1000);
-    return () => clearInterval(interval);
+    if (keys.length > 0) {
+      const interval = setInterval(() => {
+        checkExpiry();
+      }, 1000);
+      return () => clearInterval(interval);
+    }
   }, [keys, navigate]);
+
+  const checkExpiry = () => {
+    const currentTime = Math.floor(Date.now() / 1000);
+    
+    keys.forEach(keyData => {
+      // Only check expiry if we have a valid key with expiry timestamp
+      if (keyData.expire_ts && keyData.expire_ts < currentTime) {
+        // Key expired - clear all state and set expired flag
+        console.log('[KeyDashboard] Key expired, setting expired flag');
+        console.log('[KeyDashboard] Expire details:', {
+          keyExpire: keyData.expire_ts,
+          currentTime: currentTime,
+          keyData: keyData
+        });
+        setIsExpired(true);
+        setKeys([]);
+        setStats({ total: 0, active: 0, expired: 0 });
+        localStorage.removeItem('user_session');
+        
+        // Redirect to expired page with replace to prevent going back
+        navigate('/expired', { replace: true });
+        return;
+      }
+    });
+  };
 
   const loadKeys = async () => {
     try {
@@ -50,11 +102,68 @@ function KeyDashboard() {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       console.log('[KeyDashboard] Loading keys from:', apiBaseUrl);
       
-      const data = await keyService.getAllKeys();
-      // Backend returns { success: true, data: [...] }
-      const keysData = data.data || [];
-      setKeys(keysData);
-      updateStats(keysData);
+      // First check if we have a valid key for the service
+      const service = 'lootlab'; // Default service
+      const checkResponse = await fetch(`${apiBaseUrl}/api/check-key-status?service=${service}`);
+      
+      if (checkResponse.ok) {
+        const checkData = await checkResponse.json();
+        console.log('[KeyDashboard] Key status check response:', checkData);
+        
+        if (checkData.hasKey && checkData.sessionToken) {
+          // Save session token
+          localStorage.setItem('user_session', checkData.sessionToken);
+          console.log('[KeyDashboard] Session token saved:', checkData.sessionToken);
+          
+          // Create key object from response
+          const keyData = {
+            id: '1',
+            key: checkData.key,
+            status: 'ACTIVE',
+            timeLeft: checkData.timeLeft || 0,
+            expire_ts: checkData.expireTs || 0,
+            createdAt: new Date().toISOString(),
+            service: checkData.service || service
+          };
+          
+          console.log('[KeyDashboard] Key data created:', keyData);
+          console.log('[KeyDashboard] Time comparison:', {
+            expireTs: keyData.expire_ts,
+            currentTime: Math.floor(Date.now() / 1000),
+            isValid: keyData.expire_ts > Math.floor(Date.now() / 1000)
+          });
+          
+          setKeys([keyData]);
+          updateStats([keyData]);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback to demo data if no valid key
+      console.log('[KeyDashboard] No valid key found, using demo data');
+      const currentTime = Math.floor(Date.now() / 1000);
+      const demoKeys = [
+        {
+          id: '1',
+          key: 'KHOA-24-ABC123XYZ123456789012345',
+          status: 'ACTIVE',
+          timeLeft: 72000,
+          expire_ts: currentTime + 72000,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          key: 'KHOA-48-DEF456UVW123456789012345',
+          status: 'ACTIVE',
+          timeLeft: 150000,
+          expire_ts: currentTime + 150000,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      setKeys(demoKeys);
+      updateStats(demoKeys);
+      
     } catch (error) {
       console.error('[KeyDashboard] Error loading keys:', error);
       // Demo data if API fails
