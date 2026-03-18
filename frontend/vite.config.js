@@ -15,7 +15,7 @@ export default defineConfig({
 
           // Log ra Terminal một cách gọn gàng
           if (req.url.includes('/api')) {
-             console.log(`\x1b[36m[${time}]\x1b[0m \x1b[32m${req.method}\x1b[0m ${req.url} | \x1b[33mIP: ${ip}\x1b[0m | \x1b[35mHWID: ${hwid}\x1b[0m`);
+             console.log(`\x1b[36m[${time}]\x1b[0m \x1b[32m${req.method}\x1b[0m ${req.url} | \x1b[33mIP: ${ip}\x1b[0m | \x1b[35mHWID: ${hwid}\x1b[0m | \x1b[31mPORT: 7860\x1b[0m`);
           }
           next();
         });

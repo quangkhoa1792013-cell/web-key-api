@@ -162,17 +162,15 @@ function KeyDisplay() {
     
     try {
         console.log('[KeyDisplay] 🗑️ DELETING SESSION...');
-        console.log('[KeyDisplay] Delete API URL:', `/api/session/${id}`);
+        console.log('[KeyDisplay] Delete API URL:', `/api/delete-session`);
         console.log('[KeyDisplay] Request payload:', {
           sessionId: id,
           hwid: keyData?.hwid || 'UNKNOWN'
         });
         
-        const deleteResponse = await api.delete(`/api/session/${id}`, {
-          data: {
-            sessionId: id,
-            hwid: keyData?.hwid || 'UNKNOWN'
-          }
+        const deleteResponse = await api.post('/api/delete-session', {
+          sessionId: id,
+          hwid: keyData?.hwid || 'UNKNOWN'
         });
 
         console.log('[KeyDisplay] Delete response status:', deleteResponse.status);
@@ -187,12 +185,9 @@ function KeyDisplay() {
           localStorage.clear();
           sessionStorage.clear();
           
-          // Wait a moment then redirect to home
-          console.log('[KeyDisplay] ⏳ Waiting 2 seconds before redirect...');
-          setTimeout(() => {
-            console.log('[KeyDisplay] 🏠 FORCE REDIRECT TO HOME');
-            window.location.href = '/';
-          }, 2000);
+          // Force redirect to home
+          console.log('[KeyDisplay] 🏠 FORCE REDIRECT TO HOME');
+          window.location.href = '/';
         } else {
           console.error('[KeyDisplay] ❌ Delete failed:', deleteResponse.data);
           console.log('[KeyDisplay] Delete error status:', deleteResponse.status);
@@ -309,14 +304,12 @@ function KeyDisplay() {
             <div className="mt-8 text-center">
               <h3 className="text-lg font-semibold text-white mb-4">Thời gian còn lại</h3>
               <div className={`text-6xl font-mono font-bold transition-all duration-300 ${
-                isExpired 
-                  ? 'text-red-400 animate-pulse' 
-                  : 'text-green-400'
+                isExpired ? 'text-red-600 animate-pulse' : 'text-green-400'
               }`}>
                 {formatTime(timeLeft)}
               </div>
               {isExpired && (
-                <p className="text-red-400 mt-2">Phiên đã hết hạn</p>
+                <p className="text-red-600 mt-2">Phiên đã hết hạn</p>
               )}
             </div>
 

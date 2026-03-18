@@ -242,6 +242,25 @@ try:
         log_error("❌ Database connection failed")
 except Exception as e:
     log_error(f"❌ Failed to initialize database: {e}")
+
+# Add radar logging before request handling
+@app.before_request
+def radar_logging():
+    """Log all incoming requests with HWID tracking"""
+    try:
+        hwid = request.headers.get('X-HWID', 'No-HWID')
+        method = request.method
+        path = request.path
+        ip = request.remote_addr or 'unknown'
+        
+        # Only log API requests
+        if path.startswith('/api'):
+            log_error(f"[RADAR] {method} | {path} | HWID: {hwid} | IP: {ip}")
+    except Exception as e:
+        log_error(f"[RADAR] Logging error: {e}")
+
+# Register the radar function
+app.before_request(radar_logging)
     log_error(f"Traceback: {traceback.format_exc()}")
     key_system = None
 
