@@ -16,12 +16,22 @@ function KeyDisplay() {
   // Fetch key data on mount
   useEffect(() => {
     const fetchKeyData = async () => {
+      console.log('[KeyDisplay] === STARTING KEY FETCH ===');
+      console.log('[KeyDisplay] Fetching key for ID:', id);
+      
       try {
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
-        const response = await fetch(`${apiBaseUrl}/api/get-key?id=${id}`);
+        const url = `${apiBaseUrl}/api/get-key?id=${id}`;
+        console.log('[KeyDisplay] Full API URL:', url);
+        
+        const response = await fetch(url);
+        console.log('[KeyDisplay] Response status:', response.status);
+        console.log('[KeyDisplay] Response ok:', response.ok);
         
         if (response.ok) {
           const data = await response.json();
+          console.log('[KeyDisplay] Response data:', data);
+          
           if (data.success && data.key) {
             setKeyData(data.key);
             
@@ -31,23 +41,28 @@ function KeyDisplay() {
             setTimeLeft(initialTimeLeft);
             setIsExpired(initialTimeLeft <= 0);
             
-            console.log('[KeyDisplay] Key loaded:', data.key);
-            console.log('[KeyDisplay] Time left:', initialTimeLeft);
+            console.log('[KeyDisplay] ✅ Key loaded successfully:', data.key);
+            console.log('[KeyDisplay] Current timestamp:', currentTime);
+            console.log('[KeyDisplay] Key expire timestamp:', data.key.expire_ts);
+            console.log('[KeyDisplay] Initial time left (seconds):', initialTimeLeft);
+            console.log('[KeyDisplay] Initial time left (formatted):', formatTime(initialTimeLeft));
+            console.log('[KeyDisplay] Is expired initially:', initialTimeLeft <= 0);
           } else {
-            // Key not found
+            console.log('[KeyDisplay] ❌ Key not found in response');
             setKeyData(null);
             setIsExpired(true);
           }
         } else {
-          console.error('[KeyDisplay] Failed to fetch key');
+          console.error('[KeyDisplay] ❌ Failed to fetch key - Status:', response.status);
           setKeyData(null);
           setIsExpired(true);
         }
       } catch (error) {
-        console.error('[KeyDisplay] Error fetching key:', error);
+        console.error('[KeyDisplay] ❌ Error fetching key:', error);
         setKeyData(null);
         setIsExpired(true);
       } finally {
+        console.log('[KeyDisplay] === KEY FETCH COMPLETE ===');
         setLoading(false);
       }
     };
@@ -59,21 +74,39 @@ function KeyDisplay() {
   useEffect(() => {
     if (!keyData || isExpired) return;
 
+    console.log('[KeyDisplay] === STARTING COUNTDOWN TIMER ===');
+    console.log('[KeyDisplay] Initial time left:', timeLeft);
+    console.log('[KeyDisplay] Key expire timestamp:', keyData.expire_ts);
+
     const interval = setInterval(() => {
       const currentTime = Math.floor(Date.now() / 1000);
       const newTimeLeft = Math.max(0, keyData.expire_ts - currentTime);
       
+      console.log('[KeyDisplay] ⏰ Countdown update:');
+      console.log('[KeyDisplay] Current time:', currentTime);
+      console.log('[KeyDisplay] Expire time:', keyData.expire_ts);
+      console.log('[KeyDisplay] New time left:', newTimeLeft);
+      console.log('[KeyDisplay] Formatted time:', formatTime(newTimeLeft));
+      
       setTimeLeft(newTimeLeft);
       
       if (newTimeLeft <= 0) {
+        console.log('[KeyDisplay] 🚨 COUNTDOWN REACHED ZERO!');
+        console.log('[KeyDisplay] Activating expired state...');
         setIsExpired(true);
         clearInterval(interval);
-        console.log('[KeyDisplay] Key expired at:', new Date(currentTime * 1000));
+        
+        // Log the exact moment of expiry
+        console.log('[KeyDisplay] EXPIRED AT:', new Date(currentTime * 1000).toISOString());
+        console.log('[KeyDisplay] === COUNTDOWN ENDED ===');
       }
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [keyData, isExpired]);
+    return () => {
+      console.log('[KeyDisplay] === CLEANING UP COUNTDOWN TIMER ===');
+      clearInterval(interval);
+    };
+  }, [keyData, isExpired, timeLeft]);
 
   const formatTime = (seconds) => {
     if (seconds <= 0) return '00:00:00';
@@ -95,41 +128,65 @@ function KeyDisplay() {
   };
 
   const getNewKey = async () => {
+    console.log('[KeyDisplay] === GET NEW KEY PROCESS STARTED ===');
+    console.log('[KeyDisplay] Session ID to delete:', id);
+    console.log('[KeyDisplay] Key HWID:', keyData?.hwid);
+    console.log('[KeyDisplay] User clicked Get New Key button');
+    
     setShowAlert(true);
     setDeleting(true);
     
     try {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
+      const deleteUrl = `${apiBaseUrl}/api/delete-session`;
       
-      // Delete the current key from database
-      const deleteResponse = await fetch(`${apiBaseUrl}/api/delete-session`, {
+      console.log('[KeyDisplay] 🗑️ DELETING SESSION...');
+      console.log('[KeyDisplay] Delete API URL:', deleteUrl);
+      console.log('[KeyDisplay] Request payload:', {
+        sessionId: id,
+        hwid: keyData?.hwid || 'UNKNOWN'
+      });
+      
+      const deleteResponse = await fetch(deleteUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
           sessionId: id,
-          hwid: keyData.hwid || 'UNKNOWN' 
+          hwid: keyData?.hwid || 'UNKNOWN' 
         })
       });
 
+      console.log('[KeyDisplay] Delete response status:', deleteResponse.status);
+      console.log('[KeyDisplay] Delete response ok:', deleteResponse.ok);
+
       if (deleteResponse.ok) {
-        console.log('[KeyDisplay] Key deleted successfully');
+        const deleteData = await deleteResponse.json();
+        console.log('[KeyDisplay] ✅ Delete response data:', deleteData);
+        console.log('[KeyDisplay] ✅ Session deleted successfully!');
+        console.log('[Vite] API DELETE called for Session:', id);
         
         // Wait a moment then redirect to home
+        console.log('[KeyDisplay] ⏳ Waiting 2 seconds before redirect...');
         setTimeout(() => {
+          console.log('[KeyDisplay] 🏠 Redirecting to home page...');
           navigate('/');
         }, 2000);
       } else {
-        console.error('[KeyDisplay] Failed to delete key');
+        const errorData = await deleteResponse.json();
+        console.error('[KeyDisplay] ❌ Delete failed:', errorData);
+        console.log('[KeyDisplay] Delete error status:', deleteResponse.status);
         setDeleting(false);
         setShowAlert(false);
       }
     } catch (error) {
-      console.error('[KeyDisplay] Error deleting key:', error);
+      console.error('[KeyDisplay] ❌ Error deleting key:', error);
       setDeleting(false);
       setShowAlert(false);
     }
+    
+    console.log('[KeyDisplay] === GET NEW KEY PROCESS COMPLETE ===');
   };
 
   if (loading) {
@@ -141,6 +198,7 @@ function KeyDisplay() {
   }
 
   if (!keyData) {
+    console.log('[KeyDisplay] ❌ Key not found - showing 404 page');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-8 max-w-md text-center">
@@ -148,7 +206,10 @@ function KeyDisplay() {
           <h2 className="text-2xl font-bold text-white mb-2">Phiên không tồn tại</h2>
           <p className="text-slate-400 mb-6">Key này đã hết hạn hoặc bị xóa khỏi hệ thống.</p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {
+              console.log('[KeyDisplay] User clicked return to home from 404 page');
+              navigate('/');
+            }}
             className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
           >
             Quay lại trang chủ
