@@ -20,6 +20,7 @@
     "@tailwindcss/postcss": "^4.2.1",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "latest",
+    "lightningcss": "^1.32.0",
     "postcss": "latest",
     "tailwindcss": "latest",
     "vite": "^6.4.1"
