@@ -22,6 +22,9 @@ function App() {
           {/* Key display page with query params */}
           <Route path="/key" element={<KeyDisplayPage />} />
           
+          {/* NEW: Sealed key display page - "đóng đinh" URL */}
+          <Route path="/s/:id" element={<KeyDisplayPage />} />
+          
           {/* Dashboard and expired page */}
           <Route path="/dashboard" element={<KeyDashboard />} />
           <Route path="/expired" element={<ExpiredPage />} />

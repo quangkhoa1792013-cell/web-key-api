@@ -259,10 +259,8 @@ def radar_logging():
     except Exception as e:
         log_error(f"[RADAR] Logging error: {e}")
 
-# Register the radar function
+# Register radar function
 app.before_request(radar_logging)
-    log_error(f"Traceback: {traceback.format_exc()}")
-    key_system = None
 
 @app.route('/api/test-db', methods=['GET'])
 def test_database():
