@@ -37,6 +37,11 @@ function KeyDashboard() {
               // Session valid, load keys normally
               loadKeys();
               return;
+            } else if (data.status === 'expired') {
+              console.log('[KeyDashboard] Session expired but key exists, loading expired key...');
+              // Session expired but key exists, load expired key
+              loadKeys(true); // Pass flag to indicate expired key
+              return;
             } else {
               console.log('[KeyDashboard] Session invalid, clearing token:', data.error);
               localStorage.removeItem('user_session');
@@ -93,7 +98,7 @@ function KeyDashboard() {
     });
   };
 
-  const loadKeys = async () => {
+  const loadKeys = async (isExpiredKey = false) => {
     try {
       // Reset expired state when loading keys
       setIsExpired(false);
@@ -119,7 +124,7 @@ function KeyDashboard() {
           const keyData = {
             id: '1',
             key: checkData.key,
-            status: 'ACTIVE',
+            status: checkData.status === 'expired' ? 'EXPIRED' : 'ACTIVE',
             timeLeft: checkData.timeLeft || 0,
             expire_ts: checkData.expireTs || 0,
             createdAt: new Date().toISOString(),
@@ -361,19 +366,38 @@ function KeyDashboard() {
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
                   {keys.map((keyData) => (
-                    <tr key={keyData.id} className="hover:bg-slate-700/30 transition-colors">
+                    <tr key={keyData.id} className={`hover:bg-slate-700/30 transition-colors ${
+                      keyData.status === 'EXPIRED' ? 'opacity-60' : ''
+                    }`}>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-lg">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+                            keyData.status === 'EXPIRED'
+                              ? 'bg-gradient-to-br from-red-400 to-red-500'
+                              : 'bg-gradient-to-br from-yellow-400 to-orange-500'
+                          }`}>
                             <Key className="w-5 h-5 text-white" />
                           </div>
-                          <span className="font-mono text-white text-sm">{keyData.key}</span>
+                          <div>
+                            <span className="font-mono text-white text-sm">{keyData.key}</span>
+                            {keyData.status === 'EXPIRED' && (
+                              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30">
+                                KEY EXPIRED
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="py-4 px-6 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <Clock className="w-4 h-4 text-green-400" />
-                          <span className="font-mono text-green-400">{formatTime(keyData.timeLeft)}</span>
+                          <Clock className={`w-4 h-4 ${
+                            keyData.status === 'EXPIRED' ? 'text-red-400' : 'text-green-400'
+                          }`} />
+                          <span className={`font-mono ${
+                            keyData.status === 'EXPIRED' ? 'text-red-400' : 'text-green-400'
+                          }`}>
+                            {formatTime(keyData.timeLeft)}
+                          </span>
                         </div>
                       </td>
                       <td className="py-4 px-6 text-center">
@@ -382,33 +406,46 @@ function KeyDashboard() {
                             ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                             : 'bg-red-500/20 text-red-400 border border-red-500/30'
                         }`}>
-                          {keyData.status === 'ACTIVE' ? 'Hoạt động' : 'Hết hạn'}
+                          {keyData.status === 'ACTIVE' ? 'Đang hoạt động' : 'Hết hạn'}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                        {keyData.status === 'EXPIRED' ? (
                           <button
-                            onClick={() => copyKey(keyData.key)}
-                            className="p-2 bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-colors"
-                            title="Copy key"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => renewKey(keyData.id)}
-                            className="p-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors"
-                            title="Gia hạn +24H"
+                            onClick={() => {
+                              localStorage.removeItem('user_session');
+                              navigate('/skip');
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors mx-auto"
                           >
                             <RefreshCw className="w-4 h-4" />
+                            Renew Key
                           </button>
-                          <button
-                            onClick={() => deleteKey(keyData.id)}
-                            className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
-                            title="Xóa key"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => copyKey(keyData.key)}
+                              className="p-2 bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-colors"
+                              title="Copy key"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => renewKey(keyData.id)}
+                              className="p-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors"
+                              title="Gia hạn +24H"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => deleteKey(keyData.id)}
+                              className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
+                              title="Xóa key"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

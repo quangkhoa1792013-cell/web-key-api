@@ -436,6 +436,23 @@ def check_key_status():
                         'currentTime': current_time,
                         'message': 'Key is valid'
                     })
+                # Nếu key đã hết hạn nhưng vẫn tồn tại trong DB
+                elif expire_ts <= current_time and status == 'ACTIVE':
+                    # Tạo session token cho key hết hạn
+                    session_token = f"session_{key_value}_{int(time.time())}"
+                    
+                    log_error(f"⚠️ Expired key found: {key_value}")
+                    return jsonify({
+                        'hasKey': True,
+                        'status': 'expired',
+                        'key': key_value,
+                        'expireTs': expire_ts,
+                        'service': key_service,
+                        'sessionToken': session_token,
+                        'timeLeft': 0,
+                        'currentTime': current_time,
+                        'message': 'Key has expired'
+                    })
             
             # Không có key nào hợp lệ
             log_error(f"❌ No valid keys found for service: {service}")
@@ -525,6 +542,18 @@ def verify_session():
                     'timeLeft': expire_ts - current_time,
                     'currentTime': current_time,
                     'message': 'Session is valid'
+                })
+            elif expire_ts <= current_time and status == 'ACTIVE':
+                # Key hết hạn nhưng vẫn trả về thông tin
+                return jsonify({
+                    'valid': True,
+                    'key': db_key,
+                    'expireTs': expire_ts,
+                    'service': service,
+                    'timeLeft': 0,
+                    'currentTime': current_time,
+                    'status': 'expired',
+                    'message': 'Key has expired but still exists'
                 })
             else:
                 return jsonify({
