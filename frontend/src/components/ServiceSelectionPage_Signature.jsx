@@ -23,7 +23,7 @@ function ServiceSelectionPage() {
       
       for (const service of services) {
         try {
-          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
+          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla2013.pythonanywhere.com';
           const response = await fetch(`${apiBaseUrl}/api/check-key-status?service=${service.id}`);
           const result = await response.json();
           
@@ -63,7 +63,7 @@ function ServiceSelectionPage() {
       const randomId = Math.random().toString(36).substring(2, 10).toLowerCase();
       
       // Call backend to mark session
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla2013.pythonanywhere.com';
       const response = await fetch(`${apiBaseUrl}/api/mark-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
