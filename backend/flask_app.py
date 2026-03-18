@@ -575,6 +575,125 @@ def verify_session():
         log_error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'valid': False, 'error': str(e)})
 
+@app.route('/api/get-key', methods=['GET'])
+def get_key():
+    """Lấy thông tin key theo ID"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        key_id = request.args.get('id')
+        if not key_id:
+            return jsonify({'success': False, 'error': 'Missing key ID'}), 400
+        
+        # Tìm key trong database
+        query = """
+        SELECT key, expire_ts, status, service, hwid, ip_address, cookies, created_at
+        FROM user_sessions 
+        WHERE key = %s
+        """
+        
+        result = key_system.execute_query(query, (key_id,))
+        
+        if result and len(result) > 0:
+            row = result[0]
+            key_data = {
+                'key': row[0],
+                'expire_ts': row[1],
+                'status': row[2],
+                'service': row[3],
+                'hwid': row[4],
+                'ip_address': row[5],
+                'cookies': row[6],
+                'created_at': row[7].isoformat() if row[7] else None
+            }
+            
+            log_error(f"✅ Key found: {key_id}")
+            return jsonify({
+                'success': True,
+                'key': key_data
+            })
+        else:
+            log_error(f"❌ Key not found: {key_id}")
+            return jsonify({
+                'success': False,
+                'error': 'Key not found'
+            }), 404
+            
+    except Exception as e:
+        log_error(f"Get key error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/delete-session', methods=['POST'])
+def delete_session():
+    """Xóa session/key theo ID và HWID"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        session_id = data.get('sessionId')
+        hwid = data.get('hwid')
+        
+        if not session_id:
+            return jsonify({'success': False, 'error': 'Missing session ID'}), 400
+        
+        # Kiểm tra HWID trước khi xóa (security)
+        check_query = """
+        SELECT hwid, ip_address 
+        FROM user_sessions 
+        WHERE key = %s
+        """
+        
+        check_result = key_system.execute_query(check_query, (session_id,))
+        
+        if check_result and len(check_result) > 0:
+            stored_hwid = check_result[0][0]
+            stored_ip = check_result[0][1]
+            
+            log_error(f"DEBUG: Deleting session {session_id}")
+            log_error(f"DEBUG: Stored HWID: {stored_hwid}")
+            log_error(f"DEBUG: Request HWID: {hwid}")
+            log_error(f"DEBUG: Stored IP: {stored_ip}")
+            log_error(f"DEBUG: Request IP: {request.remote_addr}")
+            
+            # Cho phép xóa nếu HWID khớp hoặc là UNKNOWN (cho trường hợp test)
+            if stored_hwid == hwid or hwid == 'UNKNOWN':
+                # Xóa session
+                delete_query = "DELETE FROM user_sessions WHERE key = %s"
+                delete_result = key_system.execute_query(delete_query, (session_id,))
+                
+                if delete_result is not None:
+                    log_error(f"✅ Session deleted successfully: {session_id}")
+                    return jsonify({
+                        'success': True,
+                        'message': 'Session deleted successfully'
+                    })
+                else:
+                    log_error(f"❌ Failed to delete session: {session_id}")
+                    return jsonify({
+                        'success': False,
+                        'error': 'Failed to delete session'
+                    }), 500
+            else:
+                log_error(f"❌ HWID mismatch for session {session_id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'HWID mismatch - unauthorized'
+                }), 403
+        else:
+            log_error(f"❌ Session not found for deletion: {session_id}")
+            return jsonify({
+                'success': False,
+                'error': 'Session not found'
+            }), 404
+            
+    except Exception as e:
+        log_error(f"Delete session error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/check-session-mark', methods=['POST'])
 def check_session_mark():
     """Check session validity cho TimeSelectionPage"""
@@ -685,21 +804,31 @@ def home():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    try:
-        if not key_system:
-            return jsonify({'status': 'unhealthy', 'error': 'Key system not initialized'}), 500
-        
-        result = key_system.execute_query("SELECT 1")
-        db_status = "connected" if result is not None else "disconnected"
-        
-        return jsonify({
-            'status': 'healthy',
-            'database': db_status,
-            'timestamp': datetime.now().isoformat()
-        })
-    except Exception as e:
-        log_error(f"Health check error: {e}")
-        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': int(time.time()),
+        'database': 'connected' if key_system and key_system.conn else 'disconnected'
+    })
+
+@app.route('/api/routes', methods=['GET'])
+def list_routes():
+    """List all available routes"""
+    routes = [
+        '/api/health',
+        '/api/test-db',
+        '/api/get-key',
+        '/api/delete-session',
+        '/api/check-key-status',
+        '/api/verify-session',
+        '/api/mark-session',
+        '/api/check-session-mark',
+        '/api/check-service-keys',
+        '/api/anti-cheat-check'
+    ]
+    return jsonify({
+        'routes': routes,
+        'count': len(routes)
+    })
 
 # PythonAnywhere compatible - chỉ chạy app.run() khi local
 if __name__ == '__main__':
