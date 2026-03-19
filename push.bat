@@ -22,7 +22,7 @@ git add -A
 
 echo %C%--- [!] CHI TIET NOI DUNG THAY DOI (STAT): ---%W%
 :: Hien thi ++++ va ---- cua cac file da add (staged)
-git diff --stat --cached
+git diff --stat --cached --ignore-submodules
 echo %C%----------------------------------------------%W%
 
 git commit -m "Ultra Update: %date% %time%" --allow-empty
