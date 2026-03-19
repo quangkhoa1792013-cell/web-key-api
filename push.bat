@@ -13,51 +13,53 @@ set "W=%ESC%[0m"
 
 cls
 echo %C%==========================================================%W%
-echo %C%          HE THONG DEPLOY CHI TIET v3.0 (VERBOSE)         %W%
+echo %C%       HE THONG DEPLOY "TOC CHIEN" v4.1 (CLEAN & PUSH)    %W%
 echo %C%==========================================================%W%
 
-:: --- BUOC 1: GITHUB ---
-echo %Y%[*] 1. DANG CAP NHAT GITHUB (ROOT)...%W%
+:: --- BUOC 1: GITHUB (ROOT) ---
+echo %Y%[*] 1. KIEM TRA THAY DOI GITHUB (ROOT)...%W%
+:: Làm mới bộ nhớ đệm của Git để tránh tình trạng "không thấy thay đổi"
+git rm -r --cached . >nul 2>&1
 git add .
-:: Hien thi chi tiet cac file thay doi truoc khi commit
-echo %C%--- Thong ke thay doi: ---%W%
-git diff --stat --cached
-echo %C%--------------------------%W%
-git commit -m "Update project: %date% %time%"
+echo %C%--- Danh sach file moi nhat: ---%W%
+git status --short
+
+git commit -m "Auto Update: %date% %time%" --allow-empty
+
 echo.
-echo %Y%[*] Dang day code len GitHub...%W%
-git push origin main --force --verbose
-if %ERRORLEVEL% EQU 0 (echo %G%[OK] GitHub hoan tat!%W%) else (echo %R%[ERR] GitHub loi!%W%)
+echo %Y%[*] Dang day len GitHub...%W%
+:: Pull truoc de tranh loi rejected, sau do push ngay
+git pull origin main --rebase >nul 2>&1
+git push origin main --force
+if %ERRORLEVEL% EQU 0 (echo %G%[OK] GitHub xong!%W%) else (echo %R%[ERR] GitHub kiet que!%W%)
 
 echo.
 echo %C%----------------------------------------------------------%W%
-:: --- BUOC 2: BACKEND ---
-echo %B%[*] 2. TIEN VAO MAT TRAN BACKEND...%W%
+
+:: --- BUOC 2: BACKEND (HUGGING FACE) ---
+echo %B%[*] 2. CAP NHAT MAT TRAN BACKEND...%W%
 cd backend
 
-:: Kiem tra Git
-if not exist .git (
-    echo %P%[*] Khoi tao Git moi cho Backend...%W%
-    git init
-    git branch -M main
-    git remote add hf https://huggingface.co/spaces/khoablabla/backend
+:: Xóa cache Python để nhẹ repo
+if exist "__pycache__" (
+    echo %P%[*] Dang don dep rác __pycache__...%W%
+    rd /s /q "__pycache__"
 )
 
-echo %P%[*] Dang gom hang Backend...%W%
+git rm -r --cached . >nul 2>&1
 git add .
-echo %C%--- Chi tiet file Backend: ---%W%
-git diff --stat --cached
-git commit -m "Deploy Backend: %date% %time%"
-echo.
-echo %P%[*] Dang day code len Hugging Face...%W%
-:: Dung --verbose de hien thi qua trinh truyen du lieu chi tiet
-git push hf main --force --verbose
+git commit -m "Backend Update: %date% %time%" --allow-empty
 
-if %ERRORLEVEL% EQU 0 (echo %G%[OK] Hugging Face da ruc sang!%W%) else (echo %R%[ERR] Hugging Face loi!%W%)
+echo.
+echo %P%[*] Dang cong pha Hugging Face...%W%
+:: Force push de dam bao code tren HF luon giong het may local
+git push hf main --force
+
+if %ERRORLEVEL% EQU 0 (echo %G%[OK] Hugging Face da len den!%W%) else (echo %R%[ERR] Hugging Face loi!%W%)
 
 :: --- KET THUC ---
 cd ..
 echo.
 echo %C%==========================================================%W%
-echo %G%           DA DEPLOY XONG VOI CHI TIET DAY DU!           %W%
+echo %G%          DONE! CODE DA DUOC QUET SACH VA DAY DI!         %W%
 echo %C%==========================================================%W%

@@ -1,7 +1,0 @@
-{
-    "app_name": "KHOADZ PREMIUM SYSTEM",
-    "max_slots": 3,
-    "test_duration": 30,
-    "api_port": 5000,
-    "secret_salt": "KHOA_DZ_2026"
-}
