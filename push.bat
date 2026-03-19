@@ -11,56 +11,58 @@ set "C=%ESC%[96m"
 set "R=%ESC%[91m"
 set "W=%ESC%[0m"
 
+set "START_TIME=%time%"
 cls
 echo %C%==========================================================%W%
-echo %C%       HE THONG DEPLOY "CLOUDFLARE PAGES" v7.1          %W%
+echo %C%       HE THONG DEPLOY "SUPREME FORCE" v8.0 (MAX)         %W%
 echo %C%==========================================================%W%
 
-:: --- BUOC 1: GITHUB (ROOT) ---
-echo %Y%[*] 1. DANG CAP NHAT GITHUB (ROOT)...%W%
+:: --- BUOC 1: GITHUB (ROOT/FRONTEND) ---
+echo %Y%[*] 1. CONG PHA GITHUB (ROOT/FRONTEND)...%W%
 git add -A
-
-echo %C%--- [!] CHI TIET NOI DUNG THAY DOI (STAT): ---%W%
-:: Hien thi ++++ va ---- cua cac file da add (staged)
+echo %C%--- CHI TIET THAY DOI (++++ ----): ---%W%
 git diff --stat --cached --ignore-submodules
 echo %C%----------------------------------------------%W%
 
-git commit -m "Cloudflare Pages Update: %date% %time%" --allow-empty
-
-echo.
-echo %Y%[*] Dang day code len GitHub...%W%
+git commit -m "Supreme Update: %date% %time%" --allow-empty
+echo %Y%[*] Dang FORCE PUSH len GitHub...%W%
 git push origin main --force
-if %ERRORLEVEL% EQU 0 (echo %G%[OK] GitHub hoan tat!%W%) else (echo %R%[ERR] GitHub loi!%W%)
+if %ERRORLEVEL% EQU 0 (set "STAT_GH=%G%THANH CONG%W%") else (set "STAT_GH=%R%THAT BAI%W%")
 
 echo.
 echo %C%----------------------------------------------------------%W%
 
 :: --- BUOC 2: BACKEND (HUGGING FACE) ---
-echo %B%[*] 2. TIEN VAO MAT TRAN BACKEND...%W%
+echo %B%[*] 2. DOC CHIEM MAT TRAN BACKEND...%W%
 cd backend
 
-:: Don dep rac Python
+:: Don dep rac truoc khi push
 if exist "__pycache__" rd /s /q "__pycache__"
 
-echo %P%[*] Dang gom hang Backend...%W%
 git add -A
-
-echo %C%--- [!] CHI TIET FILE BACKEND (++++ ----): ---%W%
+echo %C%--- CHI TIET BACKEND (++++ ----): ---%W%
 git diff --stat --cached
 echo %C%----------------------------------------------%W%
 
-git commit -m "Deploy Backend: %date% %time%" --allow-empty
-
-echo.
-echo %P%[*] Dang day code len Hugging Face...%W%
+git commit -m "Backend Force Deploy: %date% %time%" --allow-empty
+echo %P%[*] Dang FORCE PUSH len Hugging Face...%W%
 git push hf main --force
+if %ERRORLEVEL% EQU 0 (set "STAT_HF=%G%THANH CONG%W%") else (set "STAT_HF=%R%THAT BAI%W%")
 
-if %ERRORLEVEL% EQU 0 (echo %G%[OK] Hugging Face da ruc sang!%W%) else (echo %R%[ERR] Hugging Face loi!%W%)
-
-:: --- KET THUC ---
 cd ..
+
+:: --- KET THUC: BANG THONG KE ---
+set "END_TIME=%time%"
 echo.
 echo %C%==========================================================%W%
-echo %G%      CLOUDFLARE PAGES SE TU DONG "BAT SONG"!           %W%
-echo %G%      DEPLOY HOAN TAT - FRONTEND & BACKEND              %W%
+echo %C%           BANG TONG KET CHIEN DICH DEPLOY                %W%
 echo %C%==========================================================%W%
+echo  - Thoi gian bat dau:  %START_TIME%
+echo  - Thoi gian ket thuc: %END_TIME%
+echo  - Trang thai GitHub:  %STAT_GH%
+echo  - Trang thai Backend: %STAT_HF%
+echo  - Cloudflare Pages:   %G%Dang tu dong "Bat song"%W%
+echo %C%----------------------------------------------------------%W%
+echo %Y%[LOI KHUYEAN]: Hay kiem tra Cloudflare Dashboard ngay!%W%
+echo %C%==========================================================%W%
+pause
