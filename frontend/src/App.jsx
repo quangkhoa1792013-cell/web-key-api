@@ -21,7 +21,7 @@ function App() {
           
           {/* Key display page with query params */}
           <Route path="/key" element={<KeyDisplayPage />} />
-          
+
           {/* URL "Đóng đinh" - Khi Admin gửi link này cho người khác */}
           <Route path="/s/:id" element={<KeyDisplayPage />} />
           

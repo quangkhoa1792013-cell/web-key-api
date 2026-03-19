@@ -1,25 +1,19 @@
 git init# Logs
 logs
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-api
-.env
 __pycache__/
-*.log
+*.py[cod]
 
 .windsurf
 node_modules
 dist
 dist-ssr
 *.local
-
-backend/api
-api
 
 .vscode/*
 !.vscode/extensions.json
@@ -31,16 +25,4 @@ api
 *.sln
 *.sw?
 
-api
-api.txt
-api.php
-
-.env
-
-__pycache__/
-*.py[cod]
-
-*.log
-
-backend/api
 token

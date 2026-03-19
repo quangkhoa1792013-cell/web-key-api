@@ -248,13 +248,13 @@ except Exception as e:
 def radar_logging():
     """Log all incoming requests with HWID tracking"""
     try:
-        # Lấy HWID từ nhiều nguồn hơn
-        hwid = request.headers.get('X-HWID') or request.headers.get('x-hwid') or request.headers.get('X-Hwid') or request.headers.get('x-hwid') or 'UNKNOWN'
+        # Đọc HWID từ Header - VIẾT HOA
+        hwid = request.headers.get('X-HWID') or request.headers.get('x-hwid') or 'UNKNOWN'
         method = request.method
         path = request.path
         ip = request.remote_addr or 'unknown'
         
-        # Only log API requests
+        # Only log API requests - Đảm bảo tiền tố [RADAR]
         if path.startswith('/api'):
             log_error(f"[RADAR] {method} | {path} | HWID: {hwid} | IP: {ip}")
             
@@ -672,11 +672,11 @@ def get_key():
         log_error(f"Get key error: {e}")
         log_error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/delete-session', methods=['POST'])
 def delete_session():
     """Xóa session/key theo ID và HWID"""
     try:
+        log_error(f"[RADAR] DELETE SESSION REQUEST RECEIVED")
+        
         if not key_system:
             return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
         
@@ -700,11 +700,11 @@ def delete_session():
             stored_hwid = check_result[0][0]
             stored_ip = check_result[0][1]
             
-            log_error(f"DEBUG: Deleting session {session_id}")
-            log_error(f"DEBUG: Stored HWID: {stored_hwid}")
-            log_error(f"DEBUG: Request HWID: {hwid}")
-            log_error(f"DEBUG: Stored IP: {stored_ip}")
-            log_error(f"DEBUG: Request IP: {request.remote_addr}")
+            log_error(f"[RADAR] Deleting session {session_id}")
+            log_error(f"[RADAR] Stored HWID: {stored_hwid}")
+            log_error(f"[RADAR] Request HWID: {hwid}")
+            log_error(f"[RADAR] Stored IP: {stored_ip}")
+            log_error(f"[RADAR] Request IP: {request.remote_addr}")
             
             # Cho phép xóa nếu HWID khớp hoặc là UNKNOWN (cho trường hợp test)
             if stored_hwid == hwid or hwid == 'UNKNOWN':
@@ -713,33 +713,33 @@ def delete_session():
                 delete_result = key_system.execute_query(delete_query, (session_id,))
                 
                 if delete_result is not None:
-                    log_error(f"✅ Session deleted successfully: {session_id}")
+                    log_error(f"[RADAR] Session deleted successfully: {session_id}")
                     return jsonify({
                         'success': True,
                         'message': 'Session deleted successfully'
                     })
                 else:
-                    log_error(f"❌ Failed to delete session: {session_id}")
+                    log_error(f"[RADAR] Failed to delete session: {session_id}")
                     return jsonify({
                         'success': False,
                         'error': 'Failed to delete session'
                     }), 500
             else:
-                log_error(f"❌ HWID mismatch for session {session_id}")
+                log_error(f"[RADAR] HWID mismatch for session {session_id}")
                 return jsonify({
                     'success': False,
                     'error': 'HWID mismatch - unauthorized'
                 }), 403
         else:
-            log_error(f"❌ Session not found for deletion: {session_id}")
+            log_error(f"[RADAR] Session not found for deletion: {session_id}")
             return jsonify({
                 'success': False,
                 'error': 'Session not found'
             }), 404
             
     except Exception as e:
-        log_error(f"Delete session error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_error(f"[RADAR] Delete session error: {e}")
+        log_error(f"[RADAR] Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/check-session-mark', methods=['POST'])

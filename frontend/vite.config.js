@@ -9,8 +9,8 @@ export default defineConfig({
       configureServer(server) {
         server.middlewares.use('/api', (req, res, next) => {
           const time = new Date().toLocaleTimeString();
-          // Bắt HWID từ Header mà Frontend gửi lên
-          const hwid = req.headers['x-hwid'] || 'No-HWID';
+          // Bắt HWID từ Header mà Frontend gửi lên - VIẾT HOA
+          const hwid = req.headers['X-HWID'] || req.headers['x-hwid'] || 'No-HWID';
           const ip = req.socket.remoteAddress;
 
           // Log ra Terminal một cách gọn gàng
