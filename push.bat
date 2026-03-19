@@ -13,53 +13,51 @@ set "W=%ESC%[0m"
 
 cls
 echo %C%==========================================================%W%
-echo %C%       HE THONG DEPLOY "TOC CHIEN" v4.1 (CLEAN & PUSH)    %W%
+echo %C%       HE THONG DEPLOY "CHI TIET TOAN DIEN" v5.0          %W%
 echo %C%==========================================================%W%
 
 :: --- BUOC 1: GITHUB (ROOT) ---
-echo %Y%[*] 1. KIEM TRA THAY DOI GITHUB (ROOT)...%W%
-:: Làm mới bộ nhớ đệm của Git để tránh tình trạng "không thấy thay đổi"
-git rm -r --cached . >nul 2>&1
-git add .
-echo %C%--- Danh sach file moi nhat: ---%W%
+echo %Y%[*] 1. DANG CAP NHAT GITHUB (ROOT)...%W%
+git add -A
+echo %C%--- Thong ke chi tiet file thay doi: ---%W%
 git status --short
+echo %C%----------------------------------------%W%
 
-git commit -m "Auto Update: %date% %time%" --allow-empty
+git commit -m "Full Update: %date% %time%" --allow-empty
 
 echo.
-echo %Y%[*] Dang day len GitHub...%W%
-:: Pull truoc de tranh loi rejected, sau do push ngay
-git pull origin main --rebase >nul 2>&1
+echo %Y%[*] Dang day code len GitHub...%W%
 git push origin main --force
-if %ERRORLEVEL% EQU 0 (echo %G%[OK] GitHub xong!%W%) else (echo %R%[ERR] GitHub kiet que!%W%)
+if %ERRORLEVEL% EQU 0 (echo %G%[OK] GitHub hoan tat!%W%) else (echo %R%[ERR] GitHub loi!%W%)
 
 echo.
 echo %C%----------------------------------------------------------%W%
 
 :: --- BUOC 2: BACKEND (HUGGING FACE) ---
-echo %B%[*] 2. CAP NHAT MAT TRAN BACKEND...%W%
+echo %B%[*] 2. TIEN VAO MAT TRAN BACKEND...%W%
 cd backend
 
-:: Xóa cache Python để nhẹ repo
-if exist "__pycache__" (
-    echo %P%[*] Dang don dep rác __pycache__...%W%
-    rd /s /q "__pycache__"
-)
+:: Don dep rac Python
+if exist "__pycache__" rd /s /q "__pycache__"
 
-git rm -r --cached . >nul 2>&1
-git add .
-git commit -m "Backend Update: %date% %time%" --allow-empty
+echo %P%[*] Dang gom hang Backend...%W%
+git add -A
+echo %C%--- Chi tiet file Backend: ---%W%
+git status --short
+echo %C%------------------------------%W%
+
+git commit -m "Deploy Backend: %date% %time%" --allow-empty
 
 echo.
-echo %P%[*] Dang cong pha Hugging Face...%W%
-:: Force push de dam bao code tren HF luon giong het may local
+echo %P%[*] Dang day code len Hugging Face...%W%
 git push hf main --force
 
-if %ERRORLEVEL% EQU 0 (echo %G%[OK] Hugging Face da len den!%W%) else (echo %R%[ERR] Hugging Face loi!%W%)
+if %ERRORLEVEL% EQU 0 (echo %G%[OK] Hugging Face da ruc sang!%W%) else (echo %R%[ERR] Hugging Face loi!%W%)
 
 :: --- KET THUC ---
 cd ..
 echo.
 echo %C%==========================================================%W%
-echo %G%          DONE! CODE DA DUOC QUET SACH VA DAY DI!         %W%
+echo %G%      DA DEPLOY XONG - MOI THU DA DUOC DONG BO!           %W%
 echo %C%==========================================================%W%
+pause
