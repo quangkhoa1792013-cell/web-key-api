@@ -13,7 +13,7 @@ set "W=%ESC%[0m"
 
 cls
 echo %C%==========================================================%W%
-echo %C%       HE THONG DEPLOY "SOI TUNG DONG" v6.0 (ULTRA)       %W%
+echo %C%       HE THONG DEPLOY "CLOUDFLARE PAGES" v7.1          %W%
 echo %C%==========================================================%W%
 
 :: --- BUOC 1: GITHUB (ROOT) ---
@@ -25,7 +25,7 @@ echo %C%--- [!] CHI TIET NOI DUNG THAY DOI (STAT): ---%W%
 git diff --stat --cached --ignore-submodules
 echo %C%----------------------------------------------%W%
 
-git commit -m "Ultra Update: %date% %time%" --allow-empty
+git commit -m "Cloudflare Pages Update: %date% %time%" --allow-empty
 
 echo.
 echo %Y%[*] Dang day code len GitHub...%W%
@@ -61,5 +61,6 @@ if %ERRORLEVEL% EQU 0 (echo %G%[OK] Hugging Face da ruc sang!%W%) else (echo %R%
 cd ..
 echo.
 echo %C%==========================================================%W%
-echo %G%      MOI DONG CODE DA DUOC KIEM SOAT VA DEPLOY!          %W%
+echo %G%      CLOUDFLARE PAGES SE TU DONG "BAT SONG"!           %W%
+echo %G%      DEPLOY HOAN TAT - FRONTEND & BACKEND              %W%
 echo %C%==========================================================%W%
