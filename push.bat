@@ -14,7 +14,7 @@ set "W=%ESC%[0m"
 set "START_TIME=%time%"
 cls
 echo %C%==========================================================%W%
-echo %C%       HE THONG DEPLOY "ZERO-CRASH" v9.2                  %W%
+echo %C%       HE THONG DEPLOY v9.2                               %W%
 echo %C%==========================================================%W%
 echo.
 
@@ -31,7 +31,7 @@ if not defined HAS_CHANGE (
     goto :SKIP_GITHUB
 )
 
-echo %C%--- CAC FILE BI TRUY QUET (++++ ----): ---%W%
+echo %C%--- CAC FILE BI TRUY QUET: ---%W%
 git diff --stat --cached --ignore-submodules
 echo.
 echo %Y%[*] Tien hanh FORCE PUSH len GitHub...%W%
@@ -86,8 +86,7 @@ echo.
 echo  [+] GitHub:   %STAT_GH%
 echo  [+] Backend:  %STAT_HF%
 echo.
-echo  [>] Cloudflare Pages: %Y%Auto-Sync Active%W%
+echo  [^>] Cloudflare Pages: %Y%Auto-Sync Active%W%
 echo.
 echo %C%==========================================================%W%
 echo.
-pause
