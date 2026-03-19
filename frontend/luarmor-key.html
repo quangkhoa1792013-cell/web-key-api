@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Key - KHOADZ System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+        }
+        
+        .bg-gradient-dark {
+            background: linear-gradient(135deg, #2d2d44 0%, #1a1a2e 100%);
+        }
+        
+        .bg-gradient-success {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+        
+        .card {
+            background: #1e1e32;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #2d2d44 0%, #1f1f35 100%);
+            border-radius: 12px 12px 0 0;
+            padding: 20px;
+        }
+        
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            transition: width 0.3s ease;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+            transform: translateY(-1px);
+        }
+        
+        .btn-outline-success {
+            background: transparent;
+            border: 2px solid #22c55e;
+            color: #22c55e;
+        }
+        
+        .btn-outline-success:hover {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .btn-outline-secondary {
+            background: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .btn-outline-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .badge-success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .table th {
+            text-align: left;
+            padding: 12px 16px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .table td {
+            padding: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .key-text {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #fff;
+        }
+        
+        .timer-btn {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.1) 100%);
+            border: 2px solid #22c55e;
+            color: #22c55e;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 600;
+        }
+        
+        .timer-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .material-icons {
+            font-size: 18px;
+            vertical-align: middle;
+        }
+        
+        .ads-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .ads-dialog {
+            background: #273355;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .ads-countdown {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        
+        .link-btn {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .link-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Ads Overlay -->
+    <div id="adsOverlay" class="ads-overlay">
+        <div class="ads-dialog">
+            <div id="adsCountdown" class="ads-countdown">CLOSE IN: 5</div>
+            <button id="skipLinkBtn" class="link-btn" onclick="completeLink()">
+                ⚡ Vượt Link (<span id="linkProgress">0/0</span>)
+            </button>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- Main Card -->
+        <div class="card">
+            <!-- Card Header -->
+            <div class="card-header">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="text-center md:text-left">
+                        <h2 class="text-2xl font-bold text-white">Ronix Windows Key System</h2>
+                    </div>
+                    
+                    <div class="flex-1 mx-4">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="text-gray-400">Progress: <span id="progressText">0/3</span></span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="progressBar" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <button id="timerBtn" class="timer-btn" disabled>
+                        <span class="material-icons text-sm">hourglass_bottom</span>
+                        <span id="timer">01:32:50</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card Body -->
+            <div class="p-6">
+                <!-- Keys Table -->
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th id="keysHeader">YOUR KEYS (0/1)</th>
+                                <th class="text-center">TIME LEFT</th>
+                                <th class="text-center">STATUS</th>
+                                <th class="text-center">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="keysTableBody">
+                            <!-- Empty State -->
+                            <tr id="emptyRow">
+                                <td colspan="4" class="text-center py-12">
+                                    <div class="text-6xl mb-4">🔑</div>
+                                    <p class="text-gray-400 mb-4">Chưa có key nào. Hoàn thành vượt link để tạo key.</p>
+                                    <button id="getKeyBtn" onclick="showAdsOverlay()" disabled
+                                            class="btn btn-success opacity-50 cursor-not-allowed">
+                                        <span class="material-icons">add</span>
+                                        Get Key
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Get New Key Button (hidden initially) -->
+                <div class="text-center mt-6">
+                    <button id="newKeyBtn" onclick="showAdsOverlay()" class="btn btn-outline-success" style="display: none;">
+                        <span class="material-icons">add</span>
+                        Get a new key
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Back Button -->
+        <div class="mt-6 text-center">
+            <button onclick="goBack()" class="btn btn-outline-secondary">
+                <span class="material-icons">arrow_back</span>
+                Quay lại chọn thời gian
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        let selectedTime = 4; // hours
+        let requiredLinks = 1;
+        let completedLinks = 0;
+        let generatedKeys = [];
+        let cooldownSeconds = 6 * 3600; // 6 hours in seconds
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load from localStorage
+            selectedTime = parseInt(localStorage.getItem('selectedTime') || '4');
+            requiredLinks = parseInt(localStorage.getItem('selectedLinks') || '1');
+            
+            // Update UI
+            updateUI();
+            
+            // Start timer
+            startTimer();
+            
+            // For demo: Add a sample key
+            setTimeout(() => {
+                addKeyToTable('wkWVJdtQYQprMfdNVjWSivfDemucGaCO', selectedTime * 3600);
+            }, 500);
+        });
+
+        function updateUI() {
+            // Update progress
+            const progress = Math.min((completedLinks / requiredLinks) * 100, 100);
+            document.getElementById('progressBar').style.width = `${progress}%`;
+            document.getElementById('progressText').textContent = `${completedLinks}/${requiredLinks}`;
+            
+            // Update link button text
+            document.getElementById('linkProgress').textContent = `${completedLinks}/${requiredLinks}`;
+            
+            // Enable Get Key button if completed
+            const getKeyBtn = document.getElementById('getKeyBtn');
+            if (completedLinks >= requiredLinks) {
+                getKeyBtn.disabled = false;
+                getKeyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function showAdsOverlay() {
+            if (completedLinks >= requiredLinks) {
+                generateKey();
+                return;
+            }
+            
+            const overlay = document.getElementById('adsOverlay');
+            const countdownEl = document.getElementById('adsCountdown');
+            const skipBtn = document.getElementById('skipLinkBtn');
+            
+            overlay.style.display = 'flex';
+            
+            let countdown = 5;
+            countdownEl.textContent = `CLOSE IN: ${countdown}`;
+            skipBtn.style.display = 'none';
+            
+            const timer = setInterval(() => {
+                countdown--;
+                countdownEl.textContent = `CLOSE IN: ${countdown}`;
+                
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    countdownEl.style.display = 'none';
+                    skipBtn.style.display = 'inline-block';
+                }
+            }, 1000);
+        }
+
+        function completeLink() {
+            completedLinks++;
+            updateUI();
+            
+            // Close overlay
+            document.getElementById('adsOverlay').style.display = 'none';
+            
+            // Show notification
+            showNotification(`✅ Vượt link thành công! (${completedLinks}/${requiredLinks})`);
+            
+            // If completed all links, generate key
+            if (completedLinks >= requiredLinks) {
+                setTimeout(() => generateKey(), 500);
+            }
+        }
+
+        async function generateKey() {
+            const getKeyBtn = document.getElementById('getKeyBtn');
+            getKeyBtn.innerHTML = '<span class="material-icons">hourglass_top</span> Đang tạo...';
+            getKeyBtn.disabled = true;
+            
+            try {
+                // Call API to create key
+                const response = await fetch('http://127.0.0.1:5000/create-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        duration: selectedTime * 3600 // Convert hours to seconds
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addKeyToTable(result.key, result.duration);
+                    showNotification('✅ Tạo key thành công!');
+                    
+                    // Show new key button
+                    document.getElementById('newKeyBtn').style.display = 'inline-flex';
+                } else {
+                    showNotification(`❌ Lỗi: ${result.error}`);
+                }
+            } catch (error) {
+                // For demo, create a fake key
+                const fakeKey = 'KHOA-' + selectedTime + 'H-' + Math.random().toString(36).substring(2, 15);
+                addKeyToTable(fakeKey, selectedTime * 3600);
+                showNotification('✅ Tạo key thành công! (Demo)');
+                document.getElementById('newKeyBtn').style.display = 'inline-flex';
+            }
+            
+            getKeyBtn.innerHTML = '<span class="material-icons">add</span> Get Key';
+        }
+
+        function addKeyToTable(key, duration) {
+            // Remove empty row if exists
+            const emptyRow = document.getElementById('emptyRow');
+            if (emptyRow) emptyRow.remove();
+            
+            // Create key row
+            const tbody = document.getElementById('keysTableBody');
+            const row = document.createElement('tr');
+            
+            const expireTime = new Date(Date.now() + duration * 1000);
+            
+            row.innerHTML = `
+                <td>
+                    <div class="flex items-center gap-3">
+                        <button onclick="copyToClipboard('${key}')" class="btn btn-outline-secondary btn-sm">
+                            <span class="material-icons text-sm">file_copy</span>
+                        </button>
+                        <img src="https://cdn-icons-png.flaticon.com/512/6193/6193004.png" class="avatar" alt="key">
+                        <div>
+                            <h6 class="key-text mb-0">${key}</h6>
+                        </div>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <span class="text-sm" style="color: #4ade80">${formatTime(duration)}</span>
+                </td>
+                <td class="text-center">
+                    <span class="badge badge-success">active</span>
+                </td>
+                <td class="text-center">
+                    <button onclick="renewKey('${key}')" class="btn btn-outline-success btn-sm">
+                        <span class="material-icons text-sm">hourglass_bottom</span>
+                        + 24H
+                    </button>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+            
+            // Update header
+            generatedKeys.push(key);
+            document.getElementById('keysHeader').textContent = `YOUR KEYS (${generatedKeys.length}/3)`;
+            
+            // Start countdown
+            startKeyCountdown(row.querySelector('td:nth-child(2) span'), duration);
+        }
+
+        function startKeyCountdown(element, seconds) {
+            let remaining = seconds;
+            const interval = setInterval(() => {
+                remaining--;
+                element.textContent = formatTime(remaining);
+                element.style.color = remaining < 300 ? '#ef4444' : '#4ade80'; // Red if < 5 minutes
+                
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    element.textContent = 'EXPIRED';
+                    element.style.color = '#ef4444';
+                }
+            }, 1000);
+        }
+
+        function startTimer() {
+            // Cooldown timer (6 hours)
+            const timerBtn = document.getElementById('timerBtn');
+            
+            const interval = setInterval(() => {
+                if (cooldownSeconds > 0) {
+                    cooldownSeconds--;
+                    timerBtn.querySelector('#timer').textContent = formatTime(cooldownSeconds);
+                } else {
+                    clearInterval(interval);
+                    timerBtn.innerHTML = '<span class="material-icons">check_circle</span> Ready';
+                    timerBtn.disabled = false;
+                }
+            }, 1000);
+        }
+
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('✅ Đã copy key!');
+            });
+        }
+
+        function renewKey(key) {
+            showNotification('⏳ Đang gia hạn key...');
+            // Call API to renew key
+        }
+
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

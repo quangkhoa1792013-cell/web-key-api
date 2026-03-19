@@ -1,0 +1,13 @@
+# Netlify Redirects for Dynamic Signature System
+# Supports SPA with nested dynamic routes
+
+# Handle all routes for SPA
+/*    /index.html   200
+
+# Specific route handling for dynamic signatures
+/:serviceId-:randomId    /index.html   200
+/:serviceId-:randomId/:time    /index.html   200
+/key    /index.html   200
+
+# API proxy (if needed)
+/api/*    https://your-backend.com/:splat    200
