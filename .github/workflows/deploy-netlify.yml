@@ -1,0 +1,48 @@
+name: Deploy to Netlify
+on:
+  workflow_dispatch:  # Chỉ khi nào tôi ra lệnh 'Deploy' thì mới được build
+  push:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'  # Chỉ build khi có thay đổi trong frontend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Netlify
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: pnpm install
+
+      - name: Build project
+        working-directory: ./frontend
+        run: pnpm build
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3.1
+        with:
+          publish-dir: ./frontend/dist
+          production-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: ${{ github.event.head_commit.message }}
+          enable-pull-request-comment: false
+          enable-commit-comment: false
+          overwrites-pull-request-comment: false
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
