@@ -13,17 +13,19 @@ set "W=%ESC%[0m"
 
 cls
 echo %C%==========================================================%W%
-echo %C%       HE THONG DEPLOY "CHI TIET TOAN DIEN" v5.0          %W%
+echo %C%       HE THONG DEPLOY "SOI TUNG DONG" v6.0 (ULTRA)       %W%
 echo %C%==========================================================%W%
 
 :: --- BUOC 1: GITHUB (ROOT) ---
 echo %Y%[*] 1. DANG CAP NHAT GITHUB (ROOT)...%W%
 git add -A
-echo %C%--- Thong ke chi tiet file thay doi: ---%W%
-git status --short
-echo %C%----------------------------------------%W%
 
-git commit -m "Full Update: %date% %time%" --allow-empty
+echo %C%--- [!] CHI TIET NOI DUNG THAY DOI (STAT): ---%W%
+:: Hien thi ++++ va ---- cua cac file da add (staged)
+git diff --stat --cached
+echo %C%----------------------------------------------%W%
+
+git commit -m "Ultra Update: %date% %time%" --allow-empty
 
 echo.
 echo %Y%[*] Dang day code len GitHub...%W%
@@ -42,9 +44,10 @@ if exist "__pycache__" rd /s /q "__pycache__"
 
 echo %P%[*] Dang gom hang Backend...%W%
 git add -A
-echo %C%--- Chi tiet file Backend: ---%W%
-git status --short
-echo %C%------------------------------%W%
+
+echo %C%--- [!] CHI TIET FILE BACKEND (++++ ----): ---%W%
+git diff --stat --cached
+echo %C%----------------------------------------------%W%
 
 git commit -m "Deploy Backend: %date% %time%" --allow-empty
 
@@ -58,6 +61,6 @@ if %ERRORLEVEL% EQU 0 (echo %G%[OK] Hugging Face da ruc sang!%W%) else (echo %R%
 cd ..
 echo.
 echo %C%==========================================================%W%
-echo %G%      DA DEPLOY XONG - MOI THU DA DUOC DONG BO!           %W%
+echo %G%      MOI DONG CODE DA DUOC KIEM SOAT VA DEPLOY!          %W%
 echo %C%==========================================================%W%
 pause
