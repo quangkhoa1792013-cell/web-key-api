@@ -22,7 +22,7 @@ function App() {
           {/* Key display page with query params */}
           <Route path="/key" element={<KeyDisplayPage />} />
           
-          {/* NEW: Sealed key display page - "đóng đinh" URL */}
+          {/* URL "Đóng đinh" - Khi Admin gửi link này cho người khác */}
           <Route path="/s/:id" element={<KeyDisplayPage />} />
           
           {/* Dashboard and expired page */}

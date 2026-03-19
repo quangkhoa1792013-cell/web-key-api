@@ -248,7 +248,8 @@ except Exception as e:
 def radar_logging():
     """Log all incoming requests with HWID tracking"""
     try:
-        hwid = request.headers.get('X-HWID', 'No-HWID')
+        # Lấy HWID từ nhiều nguồn hơn
+        hwid = request.headers.get('X-HWID') or request.headers.get('x-hwid') or request.headers.get('X-Hwid') or request.headers.get('x-hwid') or 'UNKNOWN'
         method = request.method
         path = request.path
         ip = request.remote_addr or 'unknown'
@@ -256,6 +257,23 @@ def radar_logging():
         # Only log API requests
         if path.startswith('/api'):
             log_error(f"[RADAR] {method} | {path} | HWID: {hwid} | IP: {ip}")
+            
+            # Nếu nhận được HWID thì lưu ngay vào Database Neon
+            if hwid and hwid != 'UNKNOWN':
+                try:
+                    # Tìm session đang pending để cập nhật HWID
+                    update_query = """
+                    UPDATE user_sessions 
+                    SET hwid = %s, status = %s 
+                    WHERE hwid = 'UNKNOWN' OR hwid IS NULL
+                    AND key LIKE 'KHOA-%%'
+                    """
+                    
+                    params = (hwid, 'ACTIVE')
+                    key_system.execute_query(update_query, params)
+                    log_error(f"[RADAR] ✅ Updated HWID for pending sessions: {hwid}")
+                except Exception as e:
+                    log_error(f"[RADAR] ❌ Failed to update HWID: {e}")
     except Exception as e:
         log_error(f"[RADAR] Logging error: {e}")
 

@@ -171,6 +171,7 @@ function KeyDisplay() {
     console.log('[KeyDisplay] Session ID to delete:', keyId);
     console.log('[KeyDisplay] Key HWID:', keyData?.hwid);
     console.log('[KeyDisplay] User clicked Get New Key button');
+    console.log(`[ACTION] User requested DELETE for Session ID: ${keyId}`);
     
     setShowAlert(true);
     setDeleting(true);
@@ -183,6 +184,7 @@ function KeyDisplay() {
           hwid: keyData?.hwid || 'UNKNOWN'
         });
         
+        // Gọi lệnh DELETE lên API Netlify
         const deleteResponse = await api.post('/api/delete-session', {
           sessionId: keyId,
           hwid: keyData?.hwid || 'UNKNOWN'
