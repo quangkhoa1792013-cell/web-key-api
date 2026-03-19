@@ -14,7 +14,7 @@ set "W=%ESC%[0m"
 set "START_TIME=%time%"
 cls
 echo %C%==========================================================%W%
-echo %C%       HE THONG DEPLOY v9.2                               %W%
+echo %C%       HE THONG DEPLOY v9.4                               %W%
 echo %C%==========================================================%W%
 echo.
 
