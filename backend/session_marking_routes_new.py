@@ -22,7 +22,7 @@ def create_session_marking_routes(app, key_system):
             
             data = request.get_json()
             session_id = data.get('sessionId')
-            hwid = data.get('hwid')
+            hwid = request.headers.get('X-HWID', 'UNKNOWN')  # Lấy HWID từ header
             service = data.get('service', 'unknown')
             
             if not session_id:
@@ -46,7 +46,7 @@ def create_session_marking_routes(app, key_system):
                 print(f"[SESSION_MARKING] Request HWID: {hwid}")
                 
                 # Kiểm tra HWID
-                if stored_hwid == 'PENDING_SESSION':
+                if stored_hwid == 'UNKNOWN' or stored_hwid is None:
                     # HWID chưa được set, cho phép cập nhật
                     update_query = """
                     UPDATE user_sessions 
@@ -83,7 +83,7 @@ def create_session_marking_routes(app, key_system):
                     
                     return jsonify({
                         'success': False,
-                        'error': 'HWID mismatch - device not authorized',
+                        'error': 'Thiết bị không hợp lệ. Mỗi ID chỉ dành cho 1 người dùng.',
                         'stored_hwid': stored_hwid,
                         'request_hwid': hwid
                     }), 403

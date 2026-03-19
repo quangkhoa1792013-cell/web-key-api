@@ -1,11 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Copy, Clock, AlertTriangle, RefreshCw, Shield, ArrowLeft } from 'lucide-react';
 import api from '../api/axios';
 
 function KeyDisplay() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  
+  // Ưu tiên lấy ID từ URL path /s/:id (đóng đinh)
+  const getKeyId = () => {
+    // Nếu URL là /s/:id, đây là "mỏ neo" cố định
+    if (location.pathname.startsWith('/s/')) {
+      return location.pathname.split('/s/')[1];
+    }
+    // Fallback về useParams
+    return id;
+  };
+  
+  const keyId = getKeyId();
   
   const [keyData, setKeyData] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -18,11 +31,13 @@ function KeyDisplay() {
   useEffect(() => {
     const fetchKeyData = async () => {
       console.log('[KeyDisplay] === STARTING KEY FETCH ===');
-      console.log('[KeyDisplay] Fetching key for ID:', id);
+      console.log('[KeyDisplay] Fetching key for ID:', keyId);
+      console.log('[KeyDisplay] URL path:', location.pathname);
+      console.log('[KeyDisplay] Is "đóng đinh" URL:', location.pathname.startsWith('/s/'));
       
       try {
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
-        const url = `/api/get-key?id=${id}`;
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:7860';
+        const url = `/api/get-key?id=${keyId}`;
         console.log('[KeyDisplay] Full API URL:', apiBaseUrl + url);
         
         const response = await api.get(url);
@@ -153,7 +168,7 @@ function KeyDisplay() {
 
   const getNewKey = async () => {
     console.log('[KeyDisplay] === GET NEW KEY PROCESS STARTED ===');
-    console.log('[KeyDisplay] Session ID to delete:', id);
+    console.log('[KeyDisplay] Session ID to delete:', keyId);
     console.log('[KeyDisplay] Key HWID:', keyData?.hwid);
     console.log('[KeyDisplay] User clicked Get New Key button');
     
@@ -164,12 +179,12 @@ function KeyDisplay() {
         console.log('[KeyDisplay] 🗑️ DELETING SESSION...');
         console.log('[KeyDisplay] Delete API URL:', `/api/delete-session`);
         console.log('[KeyDisplay] Request payload:', {
-          sessionId: id,
+          sessionId: keyId,
           hwid: keyData?.hwid || 'UNKNOWN'
         });
         
         const deleteResponse = await api.post('/api/delete-session', {
-          sessionId: id,
+          sessionId: keyId,
           hwid: keyData?.hwid || 'UNKNOWN'
         });
 
@@ -179,14 +194,10 @@ function KeyDisplay() {
 
         if (deleteResponse.status === 200 && deleteResponse.data.success) {
           console.log('[KeyDisplay] ✅ Session deleted successfully!');
-          console.log('[KeyDisplay] 🧹 Clearing localStorage and sessionStorage...');
+          console.log('[KeyDisplay] 🧹 Removing user_session from localStorage...');
           
-          // Clear all storage
-          localStorage.clear();
-          sessionStorage.clear();
-          
-          // Force redirect to home
-          console.log('[KeyDisplay] 🏠 FORCE REDIRECT TO HOME');
+          // Xóa user_session và force redirect
+          localStorage.removeItem('user_session');
           window.location.href = '/';
         } else {
           console.error('[KeyDisplay] ❌ Delete failed:', deleteResponse.data);

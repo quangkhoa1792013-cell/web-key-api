@@ -410,10 +410,11 @@ def check_key_status():
         
         service = request.args.get('service', 'lootlab')
         ip_address = request.remote_addr
+        request_hwid = request.headers.get('X-HWID', 'UNKNOWN')
         
         # Kiểm tra key cho service cụ thể - lấy thông tin chi tiết
         query = """
-        SELECT key, expire_ts, status, service 
+        SELECT key, expire_ts, status, service, hwid
         FROM user_sessions 
         WHERE service = %s AND key LIKE 'KHOA-%%'
         ORDER BY expire_ts DESC
@@ -424,6 +425,7 @@ def check_key_status():
         
         log_error(f"DEBUG: Current time: {current_time}")
         log_error(f"DEBUG: Query result: {result}")
+        log_error(f"DEBUG: Request HWID: {request_hwid}")
         
         if result and len(result) > 0:
             # Kiểm tra key còn hạn không
@@ -432,9 +434,20 @@ def check_key_status():
                 expire_ts = row[1]
                 status = row[2]
                 key_service = row[3]
+                db_hwid = row[4]
                 
                 log_error(f"DEBUG: Checking key: {key_value}, expire_ts: {expire_ts}, status: {status}")
+                log_error(f"DEBUG: DB HWID: {db_hwid}, Request HWID: {request_hwid}")
                 log_error(f"DEBUG: Time comparison: {expire_ts} > {current_time} = {expire_ts > current_time}")
+                
+                # Kiểm tra HWID đã có giá trị chưa
+                if db_hwid and db_hwid != 'UNKNOWN' and db_hwid != request_hwid:
+                    log_error(f"DEBUG: HWID mismatch - returning device error")
+                    return jsonify({
+                        'hasKey': False,
+                        'status': 'device_mismatch',
+                        'error': 'Thiết bị không hợp lệ. Mỗi ID chỉ dành cho 1 người dùng.'
+                    })
                 
                 # Nếu key còn hạn và status active
                 if expire_ts > current_time and status == 'ACTIVE':
