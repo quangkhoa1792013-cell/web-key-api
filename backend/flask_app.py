@@ -358,10 +358,15 @@ def mark_session():
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'error': 'Invalid JSON data'}), 400
+        
+        # Lấy user_agent
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # Lấy IP từ X-Forwarded-For hoặc remote_addr
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
             
         service_id = data.get('serviceId')
         random_id = data.get('randomId')
-        ip_address = data.get('ipAddress', request.remote_addr)
         
         # Lấy URL từ request.referrer hoặc origin
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
@@ -373,14 +378,14 @@ def mark_session():
         if not service_id or not random_id:
             return jsonify({'success': False, 'error': 'Missing service or random ID'}), 400
         
-        # Kiểm tra xem key có tồn tại không
+        # Kiểm tra xem key có tồn tại không - chỉ dùng cột hiện có trong DB
         check_query = """
         SELECT key, expire_ts, status, service 
         FROM user_sessions 
-        WHERE key = %s AND random_id = %s
+        WHERE key = %s AND service = %s
         """
         
-        result = key_system.execute_query(check_query, (service_id + '-' + random_id, random_id))
+        result = key_system.execute_query(check_query, (service_id + '-' + random_id, service_id))
         
         # Insert session marking
         try:
@@ -444,8 +449,13 @@ def check_key_status():
         if not key_system:
             return jsonify({'hasKey': False, 'status': 'error'})
         
+        # Lấy user_agent
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # Lấy IP từ X-Forwarded-For hoặc remote_addr
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        
         service = request.args.get('service', 'lootlab')
-        ip_address = request.remote_addr
         request_hwid = request.headers.get('X-HWID', 'UNKNOWN')
         
         # Lấy URL từ request.referrer hoặc origin
@@ -562,6 +572,12 @@ def verify_session():
         if not key_system:
             return jsonify({'valid': False, 'error': 'Key system not initialized'})
         
+        # Lấy user_agent
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # Lấy IP từ X-Forwarded-For hoặc remote_addr
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        
         data = request.get_json()
         session_token = data.get('sessionToken')
         
@@ -580,7 +596,7 @@ def verify_session():
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
         
         # Log bản tin trinh sát
-        log_error(f"[RECON] | IP: {request.remote_addr} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: VERIFY_SESSION | URL: {target_url}")
+        log_error(f"[RECON] | IP: {ip_address} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: VERIFY_SESSION | URL: {target_url}")
         
         # Kiểm tra key trong database
         query = """
@@ -648,6 +664,12 @@ def get_key():
         if not key_system:
             return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
         
+        # Lấy user_agent
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # Lấy IP từ X-Forwarded-For hoặc remote_addr
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        
         key_id = request.args.get('id')
         if not key_id:
             return jsonify({'success': False, 'error': 'Missing key ID'}), 400
@@ -656,7 +678,7 @@ def get_key():
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
         
         # Log bản tin trinh sát
-        log_error(f"[RECON] | IP: {request.remote_addr} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: GET_KEY | URL: {target_url}")
+        log_error(f"[RECON] | IP: {ip_address} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: GET_KEY | URL: {target_url}")
         
         # Tìm key trong database
         query = """
