@@ -460,12 +460,24 @@ def check_key_status():
                 
                 # Kiểm tra HWID đã có giá trị chưa
                 if db_hwid and db_hwid != 'UNKNOWN' and db_hwid != request_hwid:
-                    log_error(f"DEBUG: HWID mismatch - returning device error")
-                    return jsonify({
-                        'hasKey': False,
-                        'status': 'device_mismatch',
-                        'error': 'Thiết bị không hợp lệ. Mỗi ID chỉ dành cho 1 người dùng.'
-                    })
+                    # Nếu trong DB là AUTO_GENERATED, cho phép cập nhật HWID thực
+                    if db_hwid == "AUTO_GENERATED":
+                        log_error(f"DEBUG: AUTO_GENERATED key found - updating HWID for: {key_value}")
+                        # Cập nhật HWID thực cho key
+                        update_hwid_query = """
+                        UPDATE user_sessions 
+                        SET hwid = %s 
+                        WHERE key = %s
+                        """
+                        key_system.execute_query(update_hwid_query, (request_hwid, key_value))
+                        log_error(f"DEBUG: Updated HWID from AUTO_GENERATED to: {request_hwid}")
+                    else:
+                        log_error(f"DEBUG: HWID mismatch - returning device error")
+                        return jsonify({
+                            'hasKey': False,
+                            'status': 'device_mismatch',
+                            'error': 'Thiết bị không hợp lệ. Mỗi ID chỉ dành cho 1 người dùng.'
+                        })
                 
                 # Nếu key còn hạn và status active
                 if expire_ts > current_time and status == 'ACTIVE':
