@@ -163,8 +163,11 @@ class NeonKeySystem:
     def execute_query(self, query, params=None):
         """Execute query với psycopg2"""
         try:
-            if not self.conn:
+            # Kiểm tra kết nối database
+            if not self.conn or (hasattr(self.conn, 'closed') and self.conn.closed != 0):
+                log_error(f"🔄 Database connection lost, attempting to reconnect...")
                 if not self.connect_db():
+                    log_error(f"❌ Failed to reconnect to database")
                     return None
             
             with self.conn.cursor() as cursor:
@@ -182,6 +185,16 @@ class NeonKeySystem:
                 else:
                     return cursor.rowcount
                     
+        except psycopg2.InterfaceError as e:
+            log_error(f"🔄 InterfaceError detected: {e}")
+            log_error(f"🔄 Attempting to reconnect...")
+            self.conn = None
+            if self.connect_db():
+                log_error(f"✅ Reconnected successfully, retrying query...")
+                return self.execute_query(query, params)  # Retry query after reconnection
+            else:
+                log_error(f"❌ Failed to reconnect after InterfaceError")
+                return None
         except Exception as e:
             log_error(f"❌ Query error: {e}")
             log_error(f"Query: {query[:100]}...")
@@ -460,9 +473,9 @@ def check_key_status():
                 
                 # Kiểm tra HWID đã có giá trị chưa
                 if db_hwid and db_hwid != 'UNKNOWN' and db_hwid != request_hwid:
-                    # Nếu trong DB là AUTO_GENERATED, cho phép cập nhật HWID thực
+                    # Nếu trong DB là AUTO_GENERATED, cho phép pass và tự động cập nhật HWID mới
                     if db_hwid == "AUTO_GENERATED":
-                        log_error(f"DEBUG: AUTO_GENERATED key found - updating HWID for: {key_value}")
+                        log_error(f"DEBUG: AUTO_GENERATED key found - allowing pass and updating HWID for: {key_value}")
                         # Cập nhật HWID thực cho key
                         update_hwid_query = """
                         UPDATE user_sessions 
@@ -471,6 +484,8 @@ def check_key_status():
                         """
                         key_system.execute_query(update_hwid_query, (request_hwid, key_value))
                         log_error(f"DEBUG: Updated HWID from AUTO_GENERATED to: {request_hwid}")
+                        # Cho phép pass (không báo lỗi)
+                        # Tiếp tục với logic bình thường
                     else:
                         log_error(f"DEBUG: HWID mismatch - returning device error")
                         return jsonify({
