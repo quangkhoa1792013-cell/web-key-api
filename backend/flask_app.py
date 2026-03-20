@@ -467,32 +467,45 @@ def check_key_status():
                 key_service = row[3]
                 db_hwid = row[4]
                 
-                log_error(f"DEBUG: Checking key: {key_value}, expire_ts: {expire_ts}, status: {status}")
-                log_error(f"DEBUG: DB HWID: {db_hwid}, Request HWID: {request_hwid}")
-                log_error(f"DEBUG: Time comparison: {expire_ts} > {current_time} = {expire_ts > current_time}")
+                log_error(f"INFO: Checking key: {key_value}, expire_ts: {expire_ts}, status: {status}")
+                log_error(f"INFO: DB HWID: {db_hwid}, Request HWID: {request_hwid}")
+                log_error(f"INFO: Time comparison: {expire_ts} > {current_time} = {expire_ts > current_time}")
                 
                 # Kiểm tra HWID đã có giá trị chưa
                 if db_hwid and db_hwid != 'UNKNOWN' and db_hwid != request_hwid:
-                    # Nếu trong DB là AUTO_GENERATED, cho phép pass và tự động cập nhật HWID mới
+                    # Nếu trong DB là AUTO_GENERATED, ghi log và báo cho frontend
                     if db_hwid == "AUTO_GENERATED":
-                        log_error(f"DEBUG: AUTO_GENERATED key found - allowing pass and updating HWID for: {key_value}")
-                        # Cập nhật HWID thực cho key
-                        update_hwid_query = """
-                        UPDATE user_sessions 
-                        SET hwid = %s 
-                        WHERE key = %s
-                        """
-                        key_system.execute_query(update_hwid_query, (request_hwid, key_value))
-                        log_error(f"DEBUG: Updated HWID from AUTO_GENERATED to: {request_hwid}")
-                        # Cho phép pass (không báo lỗi)
-                        # Tiếp tục với logic bình thường
+                        log_error(f"INFO: AUTO_GENERATED key found for: {key_value}")
+                        log_error(f"INFO: Request HWID: {request_hwid} - Please handle on client side")
+                        return jsonify({
+                            'hasKey': True,
+                            'status': 'hwid_required',
+                            'key': key_value,
+                            'expireTs': expire_ts,
+                            'service': key_service,
+                            'currentTime': current_time,
+                            'message': 'HWID verification required - Please update on client side'
+                        })
                     else:
-                        log_error(f"DEBUG: HWID mismatch - returning device error")
+                        log_error(f"ERROR: HWID mismatch for key: {key_value}")
                         return jsonify({
                             'hasKey': False,
                             'status': 'device_mismatch',
                             'error': 'Thiết bị không hợp lệ. Mỗi ID chỉ dành cho 1 người dùng.'
                         })
+                
+                # Nếu request_hwid là UNKNOWN, ghi log và báo cho frontend
+                if request_hwid == 'UNKNOWN':
+                    log_error(f"WARNING: Unknown HWID detected for key: {key_value}")
+                    return jsonify({
+                        'hasKey': True,
+                        'status': 'hwid_unknown',
+                        'key': key_value,
+                        'expireTs': expire_ts,
+                        'service': key_service,
+                        'currentTime': current_time,
+                        'message': 'Unknown HWID - Please check client configuration'
+                    })
                 
                 # Nếu key còn hạn và status active
                 if expire_ts > current_time and status == 'ACTIVE':
@@ -513,24 +526,20 @@ def check_key_status():
                     })
                 # Nếu key đã hết hạn nhưng vẫn tồn tại trong DB
                 elif expire_ts <= current_time and status == 'ACTIVE':
-                    # Tạo session token cho key hết hạn
-                    session_token = f"session_{key_value}_{int(time.time())}"
-                    
-                    log_error(f"⚠️ Expired key found: {key_value}")
+                    log_error(f"WARNING: Expired key found: {key_value}")
                     return jsonify({
                         'hasKey': True,
                         'status': 'expired',
                         'key': key_value,
                         'expireTs': expire_ts,
                         'service': key_service,
-                        'sessionToken': session_token,
-                        'timeLeft': 0,
                         'currentTime': current_time,
-                        'message': 'Key has expired'
+                        'timeExpired': current_time - expire_ts,
+                        'message': 'Key has expired - Please contact admin'
                     })
             
             # Không có key nào hợp lệ
-            log_error(f"❌ No valid keys found for service: {service}")
+            log_error(f"ERROR: No valid keys found for service: {service}")
             return jsonify({
                 'hasKey': False,
                 'status': 'inactive',
@@ -538,25 +547,13 @@ def check_key_status():
                 'message': 'No valid keys found'
             })
         else:
-            log_error(f"❌ No keys found for service: {service}")
-            # Nếu không có key cho service này, tự động tạo key mới
-            auto_generated_key = auto_generate_key(service, ip_address)
-            if auto_generated_key:
-                session_token = f"session_{auto_generated_key}_{int(time.time())}"
-                return jsonify({
-                    'hasKey': True,
-                    'status': 'auto-generated',
-                    'key': auto_generated_key,
-                    'sessionToken': session_token,
-                    'message': 'Auto-generated new key'
-                })
-            else:
-                return jsonify({
-                    'hasKey': False,
-                    'status': 'inactive',
-                    'currentTime': current_time,
-                    'message': 'Failed to auto-generate key'
-                })
+            log_error(f"ERROR: No keys found for service: {service}")
+            return jsonify({
+                'hasKey': False,
+                'status': 'no_keys',
+                'currentTime': current_time,
+                'message': 'No keys found for this service'
+            })
             
     except Exception as e:
         log_error(f"Key status check error: {e}")
@@ -907,13 +904,13 @@ def list_routes():
 
 # PythonAnywhere compatible - chỉ chạy app.run() khi local
 if __name__ == '__main__':
-    print("[FLASK_APP] 🚀 Starting Flask Application...")
-    print(f"[FLASK_APP] 📊 DATABASE_URL configured: {'Yes' if os.environ.get('DATABASE_URL') else 'No'}")
+    log_error("🚀 Starting Flask Application...")
+    log_error(f"📊 DATABASE_URL configured: {'Yes' if os.environ.get('DATABASE_URL') else 'No'}")
     
     if key_system and key_system.conn:
-        print("[FLASK_APP] ✅ Database test passed - Ready to serve!")
+        log_error("✅ Database test passed - Ready to serve!")
     else:
-        print("[FLASK_APP] ❌ Database test failed - Check configuration")
+        log_error("❌ Database test failed - Check configuration")
     
     app.run(host='0.0.0.0', port=7860, debug=True)
 
