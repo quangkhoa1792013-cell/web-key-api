@@ -537,7 +537,7 @@ def check_key_status():
                         'timeExpired': current_time - expire_ts,
                         'message': 'Key has expired - Please contact admin'
                     })
-            d
+
             # Không có key nào hợp lệ
             log_error(f"ERROR: No valid keys found for service: {service}")
             return jsonify({
