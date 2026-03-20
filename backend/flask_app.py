@@ -11,6 +11,9 @@ from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 from urllib.parse import urlparse
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Cấu hình logging để ghi ra console (sys.stdout)
 logging.basicConfig(
