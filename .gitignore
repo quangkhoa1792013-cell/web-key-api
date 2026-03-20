@@ -26,3 +26,6 @@ dist-ssr
 *.sw?
 
 token
+.env
+/logs/
+__pycache__/
