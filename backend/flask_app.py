@@ -362,34 +362,38 @@ def mark_session():
         service_id = data.get('serviceId')
         random_id = data.get('randomId')
         ip_address = data.get('ipAddress', request.remote_addr)
-        user_agent = data.get('userAgent', request.headers.get('User-Agent', ''))
         
+        # Lấy URL từ request.referrer hoặc origin
+        target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
+        
+        # Log bản tin trinh sát
+        log_error(f"[RECON] | IP: {ip_address} | HWID: {data.get('hwid', 'UNKNOWN')} | ACTION: MARK_SESSION | SERVICE: {service_id} | URL: {target_url}")
+        
+        # Validate data
         if not service_id or not random_id:
-            return jsonify({'success': False, 'error': 'Missing serviceId or randomId'}), 400
+            return jsonify({'success': False, 'error': 'Missing service or random ID'}), 400
         
-        # Check if session already exists
-        try:
-            check_query = "SELECT id FROM user_sessions WHERE key = %s"
-            result = key_system.execute_query(check_query, (random_id,))
-            
-            if result:
-                return jsonify({'success': False, 'error': 'Session already exists'}), 400
-        except Exception as db_error:
-            log_error(f"Database check error: {db_error}")
-            return jsonify({'success': False, 'error': 'Database check failed'}), 500
+        # Kiểm tra xem key có tồn tại không
+        check_query = """
+        SELECT key, expire_ts, status, service 
+        FROM user_sessions 
+        WHERE key = %s AND random_id = %s
+        """
+        
+        result = key_system.execute_query(check_query, (service_id + '-' + random_id, random_id))
         
         # Insert session marking
         try:
             insert_query = """
             INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id, expire_ts
             """
             
             session_expire_ts = int(time.time()) + 1800  # 30 minutes
             
             params = (
-                random_id,
+                service_id + '-' + random_id,
                 service_id,
                 'PENDING',
                 ip_address,
@@ -404,7 +408,8 @@ def mark_session():
                 session_id = result[0][0]
                 expire_ts = result[0][1]
                 
-                log_error(f"Session marked: {service_id}-{random_id} (ID: {session_id})")
+                # Log bản tin trinh sát khi thành công
+                log_error(f"[RECON] | IP: {ip_address} | ACTION: MARKED_SUCCESS | TOKEN: {session_id} | TARGET_URL: {target_url}")
                 
                 return jsonify({
                     'success': True,
@@ -443,6 +448,12 @@ def check_key_status():
         ip_address = request.remote_addr
         request_hwid = request.headers.get('X-HWID', 'UNKNOWN')
         
+        # Lấy URL từ request.referrer hoặc origin
+        target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
+        
+        # Log bản tin trinh sát
+        log_error(f"[RECON] | IP: {ip_address} | HWID: {request_hwid} | ACTION: CHECK_KEY | SERVICE: {service} | URL: {target_url}")
+        
         # Kiểm tra key cho service cụ thể - lấy thông tin chi tiết
         query = """
         SELECT key, expire_ts, status, service, hwid
@@ -454,10 +465,6 @@ def check_key_status():
         current_time = int(time.time())
         result = key_system.execute_query(query, (service,))
         
-        log_error(f"DEBUG: Current time: {current_time}")
-        log_error(f"DEBUG: Query result: {result}")
-        log_error(f"DEBUG: Request HWID: {request_hwid}")
-        
         if result and len(result) > 0:
             # Kiểm tra key còn hạn không
             for row in result:
@@ -467,16 +474,10 @@ def check_key_status():
                 key_service = row[3]
                 db_hwid = row[4]
                 
-                log_error(f"INFO: Checking key: {key_value}, expire_ts: {expire_ts}, status: {status}")
-                log_error(f"INFO: DB HWID: {db_hwid}, Request HWID: {request_hwid}")
-                log_error(f"INFO: Time comparison: {expire_ts} > {current_time} = {expire_ts > current_time}")
-                
                 # Kiểm tra HWID đã có giá trị chưa
                 if db_hwid and db_hwid != 'UNKNOWN' and db_hwid != request_hwid:
                     # Nếu trong DB là AUTO_GENERATED, ghi log và báo cho frontend
                     if db_hwid == "AUTO_GENERATED":
-                        log_error(f"INFO: AUTO_GENERATED key found for: {key_value}")
-                        log_error(f"INFO: Request HWID: {request_hwid} - Please handle on client side")
                         return jsonify({
                             'hasKey': True,
                             'status': 'hwid_required',
@@ -487,7 +488,6 @@ def check_key_status():
                             'message': 'HWID verification required - Please update on client side'
                         })
                     else:
-                        log_error(f"ERROR: HWID mismatch for key: {key_value}")
                         return jsonify({
                             'hasKey': False,
                             'status': 'device_mismatch',
@@ -496,7 +496,6 @@ def check_key_status():
                 
                 # Nếu request_hwid là UNKNOWN, ghi log và báo cho frontend
                 if request_hwid == 'UNKNOWN':
-                    log_error(f"WARNING: Unknown HWID detected for key: {key_value}")
                     return jsonify({
                         'hasKey': True,
                         'status': 'hwid_unknown',
@@ -512,7 +511,6 @@ def check_key_status():
                     # Tạo session token
                     session_token = f"session_{key_value}_{int(time.time())}"
                     
-                    log_error(f"✅ Valid key found: {key_value}")
                     return jsonify({
                         'hasKey': True,
                         'status': 'active',
@@ -526,7 +524,6 @@ def check_key_status():
                     })
                 # Nếu key đã hết hạn nhưng vẫn tồn tại trong DB
                 elif expire_ts <= current_time and status == 'ACTIVE':
-                    log_error(f"WARNING: Expired key found: {key_value}")
                     return jsonify({
                         'hasKey': True,
                         'status': 'expired',
@@ -539,7 +536,6 @@ def check_key_status():
                     })
 
             # Không có key nào hợp lệ
-            log_error(f"ERROR: No valid keys found for service: {service}")
             return jsonify({
                 'hasKey': False,
                 'status': 'inactive',
@@ -547,7 +543,6 @@ def check_key_status():
                 'message': 'No valid keys found'
             })
         else:
-            log_error(f"ERROR: No keys found for service: {service}")
             return jsonify({
                 'hasKey': False,
                 'status': 'no_keys',
@@ -581,6 +576,12 @@ def verify_session():
         key_value = parts[1]
         timestamp = parts[2]
         
+        # Lấy URL từ request.referrer hoặc origin
+        target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
+        
+        # Log bản tin trinh sát
+        log_error(f"[RECON] | IP: {request.remote_addr} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: VERIFY_SESSION | URL: {target_url}")
+        
         # Kiểm tra key trong database
         query = """
         SELECT key, expire_ts, status, service 
@@ -591,19 +592,12 @@ def verify_session():
         current_time = int(time.time())
         result = key_system.execute_query(query, (key_value,))
         
-        log_error(f"DEBUG: Verifying session for key: {key_value}")
-        log_error(f"DEBUG: Current time: {current_time}")
-        log_error(f"DEBUG: Query result: {result}")
-        
         if result and len(result) > 0:
             row = result[0]
             db_key = row[0]
             expire_ts = row[1]
             status = row[2]
             service = row[3]
-            
-            log_error(f"DEBUG: Session check - expire_ts: {expire_ts}, status: {status}")
-            log_error(f"DEBUG: Time comparison: {expire_ts} > {current_time} = {expire_ts > current_time}")
             
             if expire_ts > current_time and status == 'ACTIVE':
                 return jsonify({
@@ -657,6 +651,12 @@ def get_key():
         key_id = request.args.get('id')
         if not key_id:
             return jsonify({'success': False, 'error': 'Missing key ID'}), 400
+        
+        # Lấy URL từ request.referrer hoặc origin
+        target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
+        
+        # Log bản tin trinh sát
+        log_error(f"[RECON] | IP: {request.remote_addr} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: GET_KEY | URL: {target_url}")
         
         # Tìm key trong database
         query = """
@@ -912,6 +912,6 @@ if __name__ == '__main__':
     else:
         log_error("❌ Database test failed - Check configuration")
     
-    app.run(host='0.0.0.0', port=7860, debug=True)
+    app.run(host='0.0.0.0', port=7860, debug=False)
 
 # Force rebuild comment - Line added for Hugging Face rebuild
