@@ -17,7 +17,7 @@ load_dotenv()
 
 # Cấu hình logging để ghi ra console (sys.stdout)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     stream=sys.stdout
 )
@@ -30,19 +30,36 @@ CORS(app,
          'http://localhost:5173', 
          'http://localhost:3000',
          'https://khoablabla2013.pythonanywhere.com',
-         'https://khoablabla-backend.hf.space',
-         'https://khoablabla.netlify.app',
+         'https://khoablabla2013.netlify.app',
          r'^https://[a-zA-Z0-9-]+\.netlify\.app$'  # Regex cho tất cả netlify subdomains
      ],
      methods=['GET', 'POST', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
 
+def log_info(info_message):
+    """Ghi thông tin ra console"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {info_message}")
+    logging.info(info_message)
+
 def log_error(error_message):
     """Ghi lỗi ra console"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] {error_message}")
     logging.error(error_message)
+
+def log_recon(recon_message):
+    """Ghi bản tin trinh sát ra console - không dùng logging.error"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {recon_message}")
+    # Không gọi logging.error() để tránh hiển thị ERROR level
+
+def log_radar(radar_message):
+    """Ghi radar log ra console - không dùng logging.error"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {radar_message}")
+    # Không gọi logging.error() để tránh hiển thị ERROR level
 
 class NeonKeySystem:
     def __init__(self):
@@ -113,7 +130,7 @@ class NeonKeySystem:
                 cursor.execute("SELECT 1")
                 cursor.fetchone()
             
-            log_error("✅ Database connection successful!")
+            log_info("✅ Database connection successful!")
             return True
             
         except Exception as e:
@@ -155,7 +172,7 @@ class NeonKeySystem:
             with self.conn.cursor() as cursor:
                 cursor.execute(create_table_query)
             
-            log_error("✅ Tables initialized successfully")
+            log_info("✅ Tables initialized successfully")
             return True
             
         except Exception as e:
@@ -238,7 +255,7 @@ def auto_generate_key(service, ip_address):
         
         if result and len(result) > 0:
             created_key = result[0][0]
-            log_error(f"✅ Auto-generated key: {created_key} for service: {service}")
+            log_info(f"✅ Auto-generated key: {created_key} for service: {service}")
             return created_key
         else:
             log_error(f"❌ Failed to auto-generate key for service: {service}")
@@ -272,7 +289,7 @@ def radar_logging():
         
         # Only log API requests - Đảm bảo tiền tố [RADAR]
         if path.startswith('/api'):
-            log_error(f"[RADAR] {method} | {path} | HWID: {hwid} | IP: {ip}")
+            log_radar(f"[RADAR] {method} | {path} | HWID: {hwid} | IP: {ip}")
             
             # Nếu nhận được HWID thì lưu ngay vào Database Neon
             if hwid and hwid != 'UNKNOWN':
@@ -287,7 +304,7 @@ def radar_logging():
                     
                     params = (hwid, 'ACTIVE')
                     key_system.execute_query(update_query, params)
-                    log_error(f"[RADAR] ✅ Updated HWID for pending sessions: {hwid}")
+                    log_info(f"[RADAR] ✅ Updated HWID for pending sessions: {hwid}")
                 except Exception as e:
                     log_error(f"[RADAR] ❌ Failed to update HWID: {e}")
     except Exception as e:
@@ -375,7 +392,7 @@ def mark_session():
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
         
         # Log bản tin trinh sát
-        log_error(f"[RECON] | IP: {ip_address} | HWID: {data.get('hwid', 'UNKNOWN')} | ACTION: MARK_SESSION | SERVICE: {service_id} | URL: {target_url}")
+        log_recon(f"[RECON] | IP: {ip_address} | HWID: {data.get('hwid', 'UNKNOWN')} | ACTION: MARK_SESSION | SERVICE: {service_id} | URL: {target_url}")
         
         # Validate data
         if not service_id or not random_id:
@@ -394,7 +411,7 @@ def mark_session():
         try:
             insert_query = """
             INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id, expire_ts
             """
             
@@ -417,7 +434,7 @@ def mark_session():
                 expire_ts = result[0][1]
                 
                 # Log bản tin trinh sát khi thành công
-                log_error(f"[RECON] | IP: {ip_address} | ACTION: MARKED_SUCCESS | TOKEN: {session_id} | TARGET_URL: {target_url}")
+                log_recon(f"[RECON] | IP: {ip_address} | ACTION: MARKED_SUCCESS | TOKEN: {session_id} | TARGET_URL: {target_url}")
                 
                 return jsonify({
                     'success': True,
@@ -465,7 +482,7 @@ def check_key_status():
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
         
         # Log bản tin trinh sát
-        log_error(f"[RECON] | IP: {ip_address} | HWID: {request_hwid} | ACTION: CHECK_KEY | SERVICE: {service} | URL: {target_url}")
+        log_recon(f"[RECON] | IP: {ip_address} | HWID: {request_hwid} | ACTION: CHECK_KEY | SERVICE: {service} | URL: {target_url}")
         
         # Kiểm tra key cho service cụ thể - lấy thông tin chi tiết
         query = """
@@ -599,7 +616,7 @@ def verify_session():
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
         
         # Log bản tin trinh sát
-        log_error(f"[RECON] | IP: {ip_address} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: VERIFY_SESSION | URL: {target_url}")
+        log_recon(f"[RECON] | IP: {ip_address} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: VERIFY_SESSION | URL: {target_url}")
         
         # Kiểm tra key trong database
         query = """
@@ -681,7 +698,7 @@ def get_key():
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
         
         # Log bản tin trinh sát
-        log_error(f"[RECON] | IP: {ip_address} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: GET_KEY | URL: {target_url}")
+        log_recon(f"[RECON] | IP: {ip_address} | HWID: {request.headers.get('X-HWID', 'UNKNOWN')} | ACTION: GET_KEY | URL: {target_url}")
         
         # Tìm key trong database
         query = """
@@ -721,17 +738,30 @@ def get_key():
         log_error(f"Get key error: {e}")
         log_error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
+@app.route('/api/delete-session', methods=['POST'])
 def delete_session():
     """Xóa session/key theo ID và HWID"""
     try:
-        log_error(f"[RADAR] DELETE SESSION REQUEST RECEIVED")
+        log_radar(f"[RADAR] DELETE SESSION REQUEST RECEIVED")
         
         if not key_system:
             return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
         
+        # Lấy user_agent
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # Lấy IP từ X-Forwarded-For hoặc remote_addr
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        
         data = request.get_json()
         session_id = data.get('sessionId')
         hwid = data.get('hwid')
+        
+        # Lấy URL từ request.referrer hoặc origin
+        target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
+        
+        # Log bản tin trinh sát
+        log_recon(f"[RECON] | IP: {ip_address} | HWID: {hwid or 'UNKNOWN'} | ACTION: DELETE_SESSION | URL: {target_url}")
         
         if not session_id:
             return jsonify({'success': False, 'error': 'Missing session ID'}), 400
@@ -749,11 +779,11 @@ def delete_session():
             stored_hwid = check_result[0][0]
             stored_ip = check_result[0][1]
             
-            log_error(f"[RADAR] Deleting session {session_id}")
-            log_error(f"[RADAR] Stored HWID: {stored_hwid}")
-            log_error(f"[RADAR] Request HWID: {hwid}")
-            log_error(f"[RADAR] Stored IP: {stored_ip}")
-            log_error(f"[RADAR] Request IP: {request.remote_addr}")
+            log_radar(f"[RADAR] Deleting session {session_id}")
+            log_radar(f"[RADAR] Stored HWID: {stored_hwid}")
+            log_radar(f"[RADAR] Request HWID: {hwid}")
+            log_radar(f"[RADAR] Stored IP: {stored_ip}")
+            log_radar(f"[RADAR] Request IP: {request.remote_addr}")
             
             # Cho phép xóa nếu HWID khớp hoặc là UNKNOWN (cho trường hợp test)
             if stored_hwid == hwid or hwid == 'UNKNOWN':
@@ -762,25 +792,25 @@ def delete_session():
                 delete_result = key_system.execute_query(delete_query, (session_id,))
                 
                 if delete_result is not None:
-                    log_error(f"[RADAR] Session deleted successfully: {session_id}")
+                    log_radar(f"[RADAR] Session deleted successfully: {session_id}")
                     return jsonify({
                         'success': True,
                         'message': 'Session deleted successfully'
                     })
                 else:
-                    log_error(f"[RADAR] Failed to delete session: {session_id}")
+                    log_radar(f"[RADAR] Failed to delete session: {session_id}")
                     return jsonify({
                         'success': False,
                         'error': 'Failed to delete session'
                     }), 500
             else:
-                log_error(f"[RADAR] HWID mismatch for session {session_id}")
+                log_radar(f"[RADAR] HWID mismatch for session {session_id}")
                 return jsonify({
                     'success': False,
                     'error': 'HWID mismatch - unauthorized'
                 }), 403
         else:
-            log_error(f"[RADAR] Session not found for deletion: {session_id}")
+            log_radar(f"[RADAR] Session not found for deletion: {session_id}")
             return jsonify({
                 'success': False,
                 'error': 'Session not found'
