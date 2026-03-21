@@ -33,7 +33,7 @@ export const ServicePageTracker = ({ children, serviceName, path }) => {
 };
 
 // Example usage in your service page component:
-/*
+
 import { ServicePageTracker } from './serviceTracking';
 
 const WorklinkPage = () => {
@@ -49,7 +49,7 @@ const WorklinkPage = () => {
     </ServicePageTracker>
   );
 };
-*/
+
 
 // Alternative: Direct function call
 export const trackServiceAccess = async (serviceName, path) => {
