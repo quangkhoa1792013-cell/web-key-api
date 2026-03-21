@@ -37,17 +37,27 @@ CORS(app,
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
 
-def log_info(info_message):
-    """Ghi thông tin ra console với INFO level"""
+def log_msg(message):
+    """Universal logging function with intelligent level detection"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] INFO: {info_message}")
-    logging.info(info_message)
-
-def log_error(error_message):
-    """Ghi lỗi ra console với ERROR level"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] ERROR: {error_message}")
-    logging.error(error_message)
+    
+    # Check if message contains success/starting indicators
+    success_keywords = ['successful', 'Starting', 'Ready', '✅', 'started', 'completed', 'created', 'added', 'initialized']
+    error_keywords = ['❌', 'Failed', 'Error', 'Exception', 'Traceback', 'failed', 'error', 'exception']
+    traceback_keywords = ['Traceback', 'traceback', 'Exception', 'exception']
+    
+    message_lower = message.lower()
+    
+    if any(keyword.lower() in message_lower for keyword in traceback_keywords):
+        # Always use error level for traceback/exception messages
+        logging.error(f"[{timestamp}] ERROR: {message}")
+    elif any(keyword.lower() in message_lower for keyword in success_keywords):
+        logging.info(f"[{timestamp}] INFO: {message}")
+    elif any(keyword.lower() in message_lower for keyword in error_keywords):
+        logging.error(f"[{timestamp}] ERROR: {message}")
+    else:
+        # Default to info for general messages
+        logging.info(f"[{timestamp}] INFO: {message}")
 
 def log_recon(recon_message):
     """Ghi bản tin trinh sát ra console với format nhất quán"""
@@ -106,7 +116,7 @@ def extract_hwid():
     hwid_hash = hashlib.md5(hwid_seed.encode()).hexdigest()[:8].upper()
     temp_hwid = f"TEMP_{hwid_hash}"
     
-    log_info(f"🔄 Using temporary HWID for unknown device: {temp_hwid} (IP: {ip})")
+    log_msg(f"🔄 Using temporary HWID for unknown device: {temp_hwid} (IP: {ip})")
     
     return temp_hwid
 
@@ -215,12 +225,13 @@ class NeonKeySystem:
         return False
     
     def init_tables(self):
-        """Auto-create tables"""
+        """Auto-create tables with anti-skipping columns"""
         if not self.conn:
             log_error("Cannot create tables - no database connection")
             return False
         
         try:
+            # Create main table
             create_table_query = """
             CREATE TABLE IF NOT EXISTS user_sessions (
                 id SERIAL PRIMARY KEY,
@@ -240,20 +251,16 @@ class NeonKeySystem:
                 session_ip_hwid VARCHAR(255),  -- Store IP+HWID combination for this session
                 session_locked BOOLEAN DEFAULT FALSE  -- Lock session to prevent sharing
             );
-            
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_key ON user_sessions(key);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_expire_ts ON user_sessions(expire_ts);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_hwid ON user_sessions(hwid);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_ip ON user_sessions(ip_address);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_service ON user_sessions(service);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_status ON user_sessions(status);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_process_completed ON user_sessions(process_completed);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_session_ip_hwid ON user_sessions(session_ip_hwid);
-            CREATE INDEX IF NOT EXISTS idx_user_sessions_session_locked ON user_sessions(session_locked);
             """
             
             with self.conn.cursor() as cursor:
                 cursor.execute(create_table_query)
+            
+            # Check and add missing columns for existing tables
+            self.add_missing_columns()
+            
+            # Create indexes for performance
+            self.create_indexes()
             
             log_info("✅ Tables initialized successfully")
             return True
@@ -262,6 +269,69 @@ class NeonKeySystem:
             log_error(f"❌ Failed to create tables: {e}")
             log_error(f"Traceback: {traceback.format_exc()}")
             return False
+    
+    def add_missing_columns(self):
+        """Add missing columns to existing user_sessions table"""
+        try:
+            with self.conn.cursor() as cursor:
+                # Check existing columns
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'user_sessions' 
+                    AND table_schema = current_schema()
+                """)
+                existing_columns = [row[0] for row in cursor.fetchall()]
+                
+                # Add missing columns
+                columns_to_add = {
+                    'process_completed': 'BOOLEAN DEFAULT FALSE',
+                    'verification_steps': 'INTEGER DEFAULT 0',
+                    'session_ip_hwid': 'VARCHAR(255)',
+                    'session_locked': 'BOOLEAN DEFAULT FALSE',
+                    'session_token': 'VARCHAR(255)'  # Add session_token column
+                }
+                
+                for column_name, column_def in columns_to_add.items():
+                    if column_name not in existing_columns:
+                        alter_query = f"ALTER TABLE user_sessions ADD COLUMN {column_name} {column_def}"
+                        cursor.execute(alter_query)
+                        log_info(f"✅ Added missing column: {column_name}")
+                
+                # Commit changes
+                self.conn.commit()
+                
+        except Exception as e:
+            log_msg(f"❌ Failed to add missing columns: {e}")
+            # Don't return False here, as table might already exist
+    
+    def create_indexes(self):
+        """Create indexes for performance"""
+        try:
+            with self.conn.cursor() as cursor:
+                index_queries = [
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_key ON user_sessions(key);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_expire_ts ON user_sessions(expire_ts);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_hwid ON user_sessions(hwid);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_ip ON user_sessions(ip_address);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_service ON user_sessions(service);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_status ON user_sessions(status);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_process_completed ON user_sessions(process_completed);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_session_ip_hwid ON user_sessions(session_ip_hwid);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_session_locked ON user_sessions(session_locked);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_verification_steps ON user_sessions(verification_steps);",
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_session_token ON user_sessions(session_token);"
+                ]
+                
+                for query in index_queries:
+                    cursor.execute(query)
+                
+                self.conn.commit()
+                log_info("✅ Database indexes created successfully")
+                
+        except Exception as e:
+            log_msg(f"❌ Failed to create indexes: {e}")
+            # Don't return False here, as indexes might already exist
     
     def execute_query(self, query, params=None, max_retries=3):
         """Execute query với robust retry mechanism"""
@@ -1056,7 +1126,7 @@ def validate_key_access(key_id, service_name, hwid, ip_address, target_url):
     try:
         # Check if key exists and belongs to this user
         check_query = """
-        SELECT key, expire_ts, status, hwid, process_completed, created_at
+        SELECT key, expire_ts, status, hwid, process_completed, created_at, session_ip_hwid
         FROM user_sessions 
         WHERE key = %s AND service = %s
         """
@@ -1078,17 +1148,50 @@ def validate_key_access(key_id, service_name, hwid, ip_address, target_url):
         db_hwid = row[3]
         process_completed = row[4] if len(row) > 4 else False
         created_at = row[5] if len(row) > 5 else None
+        db_session_ip_hwid = row[6] if len(row) > 6 else None
         
         # ANTI-SKIPPING: Check if verification process was completed
         if not process_completed:
             log_info(f"🚫 Anti-Skipping: Key {key_id} accessed without completing verification. HWID: {hwid}, Created: {created_at}")
+            
+            # DELETE the incomplete session to prevent further access
+            delete_query = "DELETE FROM user_sessions WHERE key = %s"
+            key_system.execute_query(delete_query, (key_id,))
+            log_info(f"🗑️ Anti-Skipping: Deleted incomplete session for key {key_id}")
+            
             return jsonify({
                 'status': 'verification_incomplete',
                 'message': 'Please complete the verification process before accessing the key',
                 'service': service_name,
                 'key': key_id,
                 'created_at': created_at,
-                'action': 'complete_verification'
+                'action': 'return_home'
+            }), 403
+        
+        # ANTI-SKIPPING: Check if this IP+HWID has completed process for this service
+        current_session_ip_hwid = f"{ip_address}_{hwid}"
+        check_completion_query = """
+        SELECT COUNT(*) as completed_count
+        FROM user_sessions 
+        WHERE service = %s AND hwid = %s AND process_completed = TRUE
+        """
+        
+        completion_result = key_system.execute_query(check_completion_query, (service_name, hwid))
+        completed_count = completion_result[0][0] if completion_result else 0
+        
+        if completed_count == 0:
+            log_info(f"🚫 Anti-Skipping: User {hwid} trying to access key {key_id} without completing any process for service {service_name}")
+            
+            # DELETE the key session to prevent further access
+            delete_query = "DELETE FROM user_sessions WHERE key = %s"
+            key_system.execute_query(delete_query, (key_id,))
+            log_info(f"🗑️ Anti-Skipping: Deleted key session {key_id} due to no completed process")
+            
+            return jsonify({
+                'status': 'process_not_completed',
+                'message': 'You must complete the verification process first',
+                'service': service_name,
+                'action': 'return_home'
             }), 403
         
         # ANTI-SKIPPING: Check HWID match
@@ -1125,6 +1228,85 @@ def validate_key_access(key_id, service_name, hwid, ip_address, target_url):
             'message': 'Key validation failed',
             'service': service_name
         }), 500
+
+@app.route('/api/mark-session', methods=['POST'])
+def mark_session_start():
+    """Mark session start with IP and HWID for anti-sharing protection"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        service_name = data.get('service')
+        duration = data.get('duration')
+        
+        if not service_name or not duration:
+            return jsonify({'success': False, 'error': 'Missing service or duration'}), 400
+        
+        # Lấy user info
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        hwid = extract_hwid()
+        
+        # Tạo session identifier duy nhất cho tiến trình này
+        import hashlib
+        import time
+        session_seed = f"{service_name}_{duration}_{ip_address}_{hwid}_{int(time.time())}"
+        session_hash = hashlib.md5(session_seed.encode()).hexdigest()[:16].upper()
+        session_ip_hwid = f"{ip_address}_{hwid}"
+        
+        # Lưu session với anti-sharing protection
+        insert_query = """
+        INSERT INTO user_sessions (
+            key, service, status, ip_address, expire_ts, hwid, 
+            cookies, process_completed, verification_steps, 
+            session_ip_hwid, session_locked, created_at
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+        )
+        """
+        
+        # Tính thời gian hết hạn tạm thời (2 giờ cho process)
+        current_time = int(time.time())
+        process_expire_ts = current_time + (2 * 60 * 60)  # 2 hours
+        
+        # Chuẩn bị cookies JSON
+        cookies_data = {
+            'user_agent': user_agent,
+            'start_time': current_time,
+            'service': service_name,
+            'duration': duration
+        }
+        cookies_json = json.dumps(cookies_data)
+        
+        params = (
+            f"PROCESS_{session_hash}", service_name, 'PROCESSING',
+            ip_address, process_expire_ts, hwid, cookies_json,
+            False, 0, session_ip_hwid, True
+        )
+        
+        result = key_system.execute_query(insert_query, params)
+        
+        if result:
+            process_id = f"PROCESS_{session_hash}"
+            log_info(f"🔒 Anti-Sharing: Started verification process for {service_name}. Session ID: {process_id}, IP+HWID: {session_ip_hwid}")
+            
+            return jsonify({
+                'success': True,
+                'processId': process_id,
+                'service': service_name,
+                'duration': duration,
+                'expireTs': process_expire_ts,
+                'message': 'Verification process started successfully'
+            })
+        else:
+            log_error(f"❌ Failed to start verification process for {service_name}")
+            return jsonify({'success': False, 'error': 'Failed to start process'}), 500
+            
+    except Exception as e:
+        log_error(f"Mark session error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/start-process', methods=['POST'])
 def start_verification_process():
@@ -1268,7 +1450,7 @@ def complete_verification_process():
                 'success': False,
                 'error': 'Phát hiện nhảy cóc hoặc thay đổi thiết bị/mạng. Tiến trình đã bị hủy.',
                 'code': 'SESSION_SHARING_DETECTED',
-                'action': 'restart_process'
+                'action': 'redirect_home'
             }), 403
         
         # ANTI-SHARING: Kiểm tra session bị lock
@@ -1362,7 +1544,7 @@ def generate_final_key():
                 'success': False,
                 'error': 'Phát hiện nhảy cóc hoặc thay đổi thiết bị/mạng. Tiến trình đã bị hủy.',
                 'code': 'SESSION_SHARING_DETECTED',
-                'action': 'restart_process'
+                'action': 'redirect_home'
             }), 403
         
         if not process_completed:

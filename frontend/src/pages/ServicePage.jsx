@@ -4,7 +4,7 @@ import axios from '../api/axios';
 import './ServicePage.css';
 
 const ServicePage = ({ setUserSession }) => {
-  const { service_name } = useParams();
+  const { serviceId } = useParams();
   const navigate = useNavigate();
   
   const durations = [
@@ -47,7 +47,7 @@ const ServicePage = ({ setUserSession }) => {
     }
   };
 
-  const currentService = serviceInfo[service_name] || serviceInfo.lootlab;
+  const currentService = serviceInfo[serviceId] || serviceInfo.lootlab;
 
   const handleStartProcess = async () => {
     setLoading(true);
@@ -55,17 +55,17 @@ const ServicePage = ({ setUserSession }) => {
     try {
       // Track service access
       await axios.post('/api/track-service-access', {
-        service: service_name,
-        path: `/${service_name}/get-key&${selectedDuration}`
+        service: serviceId,
+        path: `/${serviceId}/get-key&${selectedDuration}`
       });
 
       // Navigate to link process page
-      navigate(`/${service_name}/get-key&${selectedDuration}`);
+      navigate(`/${serviceId}/get-key&${selectedDuration}`);
       
     } catch (error) {
       console.error('Failed to start process:', error);
       // Still navigate on error
-      navigate(`/${service_name}/get-key&${selectedDuration}`);
+      navigate(`/${serviceId}/get-key&${selectedDuration}`);
     } finally {
       setLoading(false);
     }
@@ -74,7 +74,7 @@ const ServicePage = ({ setUserSession }) => {
   useEffect(() => {
     // Clear any existing session when entering service page
     setUserSession(null);
-  }, [service_name, setUserSession]);
+  }, [serviceId, setUserSession]);
 
   return (
     <div className="service-page">

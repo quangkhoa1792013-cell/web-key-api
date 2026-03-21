@@ -4,7 +4,7 @@ import axios from '../api/axios';
 import './KeyResult.css';
 
 const KeyResult = ({ userSession, setUserSession, onCreateNewKey }) => {
-  const { service_name, key_id } = useParams();
+  const { serviceId, key_id } = useParams();
   const navigate = useNavigate();
   
   const [keyData, setKeyData] = useState(null);
@@ -19,7 +19,7 @@ const KeyResult = ({ userSession, setUserSession, onCreateNewKey }) => {
     linkvertise: { name: 'LinkVertise', color: '#96CEB4', icon: '🔗' }
   };
 
-  const currentService = serviceInfo[service_name] || serviceInfo.lootlab;
+  const currentService = serviceInfo[serviceId] || serviceInfo.lootlab;
 
   useEffect(() => {
     if (userSession && userSession.keyId === key_id) {
@@ -35,7 +35,7 @@ const KeyResult = ({ userSession, setUserSession, onCreateNewKey }) => {
 
   const fetchKeyData = async () => {
     try {
-      const response = await axios.get(`/api/get-key?id=${key_id}`);
+      const response = await axios.get(`/api/get-key?id=${key_id}&service=${serviceId}`);
       setKeyData(response.data);
       calculateTimeLeft(response.data.expireTs);
       
@@ -43,6 +43,7 @@ const KeyResult = ({ userSession, setUserSession, onCreateNewKey }) => {
       setUserSession({
         ...response.data,
         sessionId: key_id,
+        service: serviceId,
         hwid: localStorage.getItem('user_hwid') || 'UNKNOWN'
       });
       

@@ -48,13 +48,13 @@ function App() {
         
         {/* Trang chọn dịch vụ và thời gian */}
         <Route 
-          path="/:service_name" 
+          path="/:serviceId" 
           element={<ServicePage setUserSession={setUserSession} />} 
         />
         
         {/* Trang vượt link */}
         <Route 
-          path="/:service_name/get-key&:duration" 
+          path="/:serviceId/get-key&:time" 
           element={
             <LinkProcess 
               setUserSession={setUserSession} 

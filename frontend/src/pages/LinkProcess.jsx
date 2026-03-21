@@ -4,7 +4,7 @@ import axios from '../api/axios';
 import './LinkProcess.css';
 
 const LinkProcess = ({ setUserSession, onCreateNewKey }) => {
-  const { service_name, duration } = useParams();
+  const { serviceId, time } = useParams();
   const navigate = useNavigate();
   
   const [currentStep, setCurrentStep] = useState(0);
@@ -26,35 +26,32 @@ const LinkProcess = ({ setUserSession, onCreateNewKey }) => {
     linkvertise: { name: 'LinkVertise', color: '#96CEB4', icon: '🔗' }
   };
 
-  const currentService = serviceInfo[service_name] || serviceInfo.lootlab;
+  const currentService = serviceInfo[serviceId] || serviceInfo.lootlab;
 
   useEffect(() => {
     initializeProcess();
-  }, [service_name, duration]);
+  }, [serviceId, time]);
 
   const initializeProcess = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Track process start
-      await axios.post('/api/track-service-access', {
-        service: service_name,
-        path: `/${service_name}/get-key&${duration}`
-      });
-
-      // Initialize process on backend (no key generation yet)
+      // Start verification process
       const response = await axios.post('/api/start-process', {
-        service: service_name,
-        duration: duration
+        service: serviceId,
+        duration: time
       });
-
-      setProcessData(response.data);
-      setCurrentStep(1);
       
+      if (response.data.success) {
+        setProcessData(response.data);
+        setCurrentStep(1);
+      } else {
+        setError(response.data.error || 'Failed to start process');
+      }
     } catch (error) {
-      console.error('Failed to initialize process:', error);
-      setError('Failed to start process. Please try again.');
+      console.error('Process initialization error:', error);
+      setError('Failed to initialize process');
     } finally {
       setLoading(false);
     }
@@ -88,13 +85,13 @@ const LinkProcess = ({ setUserSession, onCreateNewKey }) => {
     try {
       // Mark process as completed (ready for key generation)
       await axios.post('/api/complete-process', {
-        service: service_name,
-        duration: duration,
+        service: serviceId,
+        duration: time,
         processId: processData?.processId
       });
 
       // Navigate to key generation page
-      navigate(`/${service_name}/get-key&${duration}?completed=true`);
+      navigate(`/${serviceId}/get-key&${time}?completed=true`);
       
     } catch (error) {
       console.error('Process completion failed:', error);
@@ -110,25 +107,16 @@ const LinkProcess = ({ setUserSession, onCreateNewKey }) => {
     try {
       // Generate the actual key
       const response = await axios.post('/api/generate-key', {
-        service: service_name,
-        duration: duration
+        service: serviceId,
+        duration: time
       });
-
-      const { keyId, key, expireTs } = response.data;
       
-      // Set user session
-      setUserSession({
-        sessionId: keyId,
-        key: key,
-        service: service_name,
-        duration: duration,
-        expireTs: expireTs,
-        hwid: localStorage.getItem('user_hwid') || 'UNKNOWN'
-      });
-
-      // Navigate to key result page
-      navigate(`/${service_name}/key-${keyId}`);
-      
+      if (response.data.success) {
+        // Navigate to key result page with the generated key
+        navigate(`/${serviceId}/key-${response.data.keyId}`);
+      } else {
+        setError(response.data.error || 'Failed to generate key');
+      }
     } catch (error) {
       console.error('Key generation failed:', error);
       setError('Failed to generate key. Please try again.');
@@ -147,12 +135,12 @@ const LinkProcess = ({ setUserSession, onCreateNewKey }) => {
         <div className="service-info" style={{ '--service-color': currentService.color }}>
           <span className="service-icon">{currentService.icon}</span>
           <span className="service-name">{currentService.name}</span>
-          <span className="duration-badge">{duration}</span>
+          <span className="duration-badge">{time}</span>
         </div>
         
         <button 
           className="cancel-btn"
-          onClick={() => navigate(`/${service_name}`)}
+          onClick={() => navigate(`/${serviceId}`)}
         >
           Cancel
         </button>
