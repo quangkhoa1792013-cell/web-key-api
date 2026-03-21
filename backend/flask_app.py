@@ -62,7 +62,7 @@ def log_radar(radar_message):
     # Không dùng logging module để tránh hiển thị ERROR level
 
 def extract_hwid():
-    """Extract HWID from multiple sources with fallback"""
+    """Extract HWID from multiple sources with flexible fallback"""
     # 1. Try header first (most reliable)
     hwid = request.headers.get('X-HWID')
     if hwid and hwid != 'UNKNOWN':
@@ -95,17 +95,20 @@ def extract_hwid():
     if hwid and hwid != 'UNKNOWN':
         return hwid
     
-    # 6. Generate fallback HWID based on IP and User-Agent
+    # 6. Flexible fallback for UNKNOWN HWID
+    # Use IP-based temporary identifier to avoid blocking legitimate users
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     user_agent = request.headers.get('User-Agent', 'Unknown')
     
-    # Create consistent HWID from IP + User-Agent hash
+    # Create consistent temporary HWID from IP + User-Agent hash
     import hashlib
     hwid_seed = f"{ip}_{user_agent}"
-    hwid_hash = hashlib.md5(hwid_seed.encode()).hexdigest()[:12].upper()
-    fallback_hwid = f"HWID_FALLBACK_{hwid_hash}"
+    hwid_hash = hashlib.md5(hwid_seed.encode()).hexdigest()[:8].upper()
+    temp_hwid = f"TEMP_{hwid_hash}"
     
-    return fallback_hwid
+    log_info(f"🔄 Using temporary HWID for unknown device: {temp_hwid} (IP: {ip})")
+    
+    return temp_hwid
 
 class NeonKeySystem:
     def __init__(self):
@@ -141,8 +144,8 @@ class NeonKeySystem:
             
             safe_config = config.copy()
             safe_config['password'] = '***'
-            log_error(f"DATABASE CONFIG: {safe_config}")
-            log_error(f"DATABASE_URL from env: {db_url[:50]}...")
+            log_info(f"DATABASE CONFIG: {safe_config}")
+            log_info(f"DATABASE_URL from env: {db_url[:50]}...")
             return config
             
         except Exception as e:
@@ -229,8 +232,13 @@ class NeonKeySystem:
                 service VARCHAR(50),
                 expire_ts BIGINT NOT NULL,
                 status VARCHAR(20) DEFAULT 'PENDING',
+                process_completed BOOLEAN DEFAULT FALSE,
+                verification_steps INTEGER DEFAULT 0,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                -- Anti-sharing fields
+                session_ip_hwid VARCHAR(255),  -- Store IP+HWID combination for this session
+                session_locked BOOLEAN DEFAULT FALSE  -- Lock session to prevent sharing
             );
             
             CREATE INDEX IF NOT EXISTS idx_user_sessions_key ON user_sessions(key);
@@ -239,6 +247,9 @@ class NeonKeySystem:
             CREATE INDEX IF NOT EXISTS idx_user_sessions_ip ON user_sessions(ip_address);
             CREATE INDEX IF NOT EXISTS idx_user_sessions_service ON user_sessions(service);
             CREATE INDEX IF NOT EXISTS idx_user_sessions_status ON user_sessions(status);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_process_completed ON user_sessions(process_completed);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_session_ip_hwid ON user_sessions(session_ip_hwid);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_session_locked ON user_sessions(session_locked);
             """
             
             with self.conn.cursor() as cursor:
@@ -434,7 +445,7 @@ def test_database():
         return jsonify({'success': True, 'message': 'Database connection successful'})
         
     except Exception as e:
-        log_error(f"Database test error: {e}")
+        log_info(f"Database test error: {e}")
         return jsonify({'success': False, 'message': f'Database test failed: {str(e)}'})
 
 @app.route('/api/check-service-keys', methods=['GET'])
@@ -934,7 +945,7 @@ def delete_session():
 
 @app.route('/<path:service_path>', methods=['GET'])
 def handle_service_redirect(service_path):
-    """Handle service redirects like /worklink-15ecz4e9 and log under [RECON]"""
+    """Handle service redirects like /worklink-15ecz4e9 with anti-skipping protection"""
     try:
         # Extract service name from path (e.g., "worklink" from "worklink-15ecz4e9")
         service_name = service_path.split('-')[0] if '-' in service_path else service_path
@@ -955,6 +966,12 @@ def handle_service_redirect(service_path):
         # Log bản tin trinh sát cho service access
         log_recon(f"[RECON] | IP: {ip_address} | HWID: {hwid} | ACTION: SERVICE_ACCESS | SERVICE: {service_name} | URL: {target_url} | PATH: /{service_path}")
         
+        # ANTI-SKIPPING: Check if this is a direct key access attempt
+        if random_id and random_id.startswith('key'):
+            # This is a direct key access attempt - validate authorization
+            key_id = random_id[4:]  # Remove 'key-' prefix
+            return validate_key_access(key_id, service_name, hwid, ip_address, target_url)
+        
         # Check if user has valid key for this service
         if not key_system:
             return jsonify({
@@ -964,9 +981,9 @@ def handle_service_redirect(service_path):
         
         # Check key status for this service
         check_query = """
-        SELECT key, expire_ts, status, hwid
+        SELECT key, expire_ts, status, hwid, process_completed, verification_steps
         FROM user_sessions 
-        WHERE service = %s AND key LIKE 'KHOA-%%' AND status = 'ACTIVE' AND expire_ts > %s
+        WHERE service = %s AND key LIKE 'KHOA-%%' AND expire_ts > %s
         ORDER BY expire_ts DESC
         LIMIT 1
         """
@@ -980,6 +997,19 @@ def handle_service_redirect(service_path):
             expire_ts = row[1]
             status = row[2]
             db_hwid = row[3]
+            process_completed = row[4] if len(row) > 4 else False
+            verification_steps = row[5] if len(row) > 5 else 0
+            
+            # ANTI-SKIPPING: Check if verification process is completed
+            if not process_completed:
+                log_info(f"🚫 Anti-Skipping: User {hwid} trying to access key without completing verification for service {service_name}")
+                return jsonify({
+                    'status': 'verification_required',
+                    'message': 'Please complete the verification process first',
+                    'service': service_name,
+                    'currentStep': verification_steps,
+                    'requiredSteps': 4  # Total verification steps required
+                }), 403
             
             # Check HWID compatibility
             if db_hwid and db_hwid != 'UNKNOWN' and db_hwid != hwid:
@@ -993,13 +1023,14 @@ def handle_service_redirect(service_path):
                         'currentTime': current_time
                     }), 200
                 else:
+                    log_info(f"🚫 Anti-Skipping: HWID mismatch for service {service_name}. DB: {db_hwid}, Request: {hwid}")
                     return jsonify({
                         'status': 'device_mismatch',
                         'message': 'Device not authorized for this service',
                         'service': service_name
                     }), 403
             
-            # Valid key found - create session
+            # Valid key found and process completed - create session
             session_token = f"session_{key_value}_{int(time.time())}"
             
             # Redirect to frontend with session info
@@ -1008,13 +1039,9 @@ def handle_service_redirect(service_path):
             return redirect(frontend_url)
             
         else:
-            # No valid key found
-            return jsonify({
-                'status': 'no_key',
-                'message': 'No valid key found for this service',
-                'service': service_name,
-                'action': 'get_key'
-            }), 200
+            # No valid key found - redirect to service selection to start process
+            log_info(f"🚫 Anti-Skipping: No valid key found for {service_name}, redirecting to start process")
+            return redirect(f"/{service_name}")
             
     except Exception as e:
         log_error(f"Service redirect error for /{service_path}: {e}")
@@ -1023,6 +1050,367 @@ def handle_service_redirect(service_path):
             'error': 'Service access failed',
             'message': 'Please try again later'
         }), 500
+
+def validate_key_access(key_id, service_name, hwid, ip_address, target_url):
+    """Validate direct key access with anti-skipping protection"""
+    try:
+        # Check if key exists and belongs to this user
+        check_query = """
+        SELECT key, expire_ts, status, hwid, process_completed, created_at
+        FROM user_sessions 
+        WHERE key = %s AND service = %s
+        """
+        
+        result = key_system.execute_query(check_query, (key_id, service_name))
+        
+        if not result or len(result) == 0:
+            log_info(f"🚫 Anti-Skipping: Key {key_id} not found for service {service_name}")
+            return jsonify({
+                'status': 'key_not_found',
+                'message': 'Invalid key or service',
+                'action': 'start_process'
+            }), 404
+        
+        row = result[0]
+        key_value = row[0]
+        expire_ts = row[1]
+        status = row[2]
+        db_hwid = row[3]
+        process_completed = row[4] if len(row) > 4 else False
+        created_at = row[5] if len(row) > 5 else None
+        
+        # ANTI-SKIPPING: Check if verification process was completed
+        if not process_completed:
+            log_info(f"🚫 Anti-Skipping: Key {key_id} accessed without completing verification. HWID: {hwid}, Created: {created_at}")
+            return jsonify({
+                'status': 'verification_incomplete',
+                'message': 'Please complete the verification process before accessing the key',
+                'service': service_name,
+                'key': key_id,
+                'created_at': created_at,
+                'action': 'complete_verification'
+            }), 403
+        
+        # ANTI-SKIPPING: Check HWID match
+        if db_hwid and db_hwid != 'UNKNOWN' and db_hwid != hwid:
+            log_info(f"🚫 Anti-Skipping: HWID mismatch for key {key_id}. DB: {db_hwid}, Request: {hwid}")
+            return jsonify({
+                'status': 'hwid_mismatch',
+                'message': 'This key is tied to a different device',
+                'service': service_name,
+                'action': 'use_correct_device'
+            }), 403
+        
+        # ANTI-SKIPPING: Check if key is expired
+        current_time = int(time.time())
+        if expire_ts <= current_time:
+            log_info(f"🚫 Anti-Skipping: Expired key {key_id} access attempted. Expired: {expire_ts}, Current: {current_time}")
+            return jsonify({
+                'status': 'key_expired',
+                'message': 'This key has expired',
+                'service': service_name,
+                'expired_at': expire_ts,
+                'current_time': current_time,
+                'action': 'create_new_key'
+            }), 403
+        
+        # All checks passed - allow access
+        log_info(f"✅ Anti-Skipping: Valid key access approved for {key_id}. HWID: {hwid}, Service: {service_name}")
+        return redirect(f"/{service_name}/key-{key_id}")
+        
+    except Exception as e:
+        log_error(f"Key validation error: {e}")
+        return jsonify({
+            'status': 'validation_error',
+            'message': 'Key validation failed',
+            'service': service_name
+        }), 500
+
+@app.route('/api/start-process', methods=['POST'])
+def start_verification_process():
+    """Start verification process and lock session to prevent sharing"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        service_name = data.get('service')
+        duration = data.get('duration')
+        
+        if not service_name or not duration:
+            return jsonify({'success': False, 'error': 'Missing service or duration'}), 400
+        
+        # Lấy user info
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        hwid = extract_hwid()
+        
+        # Tạo session identifier duy nhất cho tiến trình này
+        import hashlib
+        import time
+        session_seed = f"{service_name}_{duration}_{ip_address}_{hwid}_{int(time.time())}"
+        session_hash = hashlib.md5(session_seed.encode()).hexdigest()[:16].upper()
+        session_ip_hwid = f"{ip_address}_{hwid}"
+        
+        # Lưu session với anti-sharing protection
+        insert_query = """
+        INSERT INTO user_sessions (
+            key, service, status, ip_address, expire_ts, hwid, 
+            cookies, process_completed, verification_steps, 
+            session_ip_hwid, session_locked, created_at
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+        )
+        """
+        
+        # Tính thời gian hết hạn tạm thời (2 giờ cho process)
+        current_time = int(time.time())
+        process_expire_ts = current_time + (2 * 60 * 60)  # 2 hours
+        
+        params = (
+            f"PROCESS_{session_hash}",  # Temporary process key
+            service_name,
+            'PROCESSING',
+            ip_address,
+            process_expire_ts,
+            hwid,
+            json.dumps({
+                'process_start': current_time,
+                'service': service_name,
+                'duration': duration,
+                'user_agent': user_agent
+            }),
+            0,  # verification_steps
+            False,  # process_completed
+            session_ip_hwid,
+            True,  # session_locked
+        )
+        
+        result = key_system.execute_query(insert_query, params)
+        
+        if result:
+            process_id = f"PROCESS_{session_hash}"
+            log_info(f"🔒 Anti-Sharing: Started verification process for {service_name}. Session ID: {process_id}, IP+HWID: {session_ip_hwid}")
+            
+            return jsonify({
+                'success': True,
+                'processId': process_id,
+                'service': service_name,
+                'duration': duration,
+                'expireTs': process_expire_ts,
+                'message': 'Verification process started successfully'
+            })
+        else:
+            log_error(f"❌ Failed to start verification process for {service_name}")
+            return jsonify({'success': False, 'error': 'Failed to start process'}), 500
+            
+    except Exception as e:
+        log_error(f"Start process error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/complete-process', methods=['POST'])
+def complete_verification_process():
+    """Complete verification process and generate final key"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        service_name = data.get('service')
+        duration = data.get('duration')
+        process_id = data.get('processId')
+        
+        if not all([service_name, duration, process_id]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
+        
+        # Lấy user info
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        hwid = extract_hwid()
+        session_ip_hwid = f"{ip_address}_{hwid}"
+        
+        # Kiểm tra session có tồn tại và không bị lock
+        check_query = """
+        SELECT id, key, hwid, ip_address, session_ip_hwid, session_locked, verification_steps
+        FROM user_sessions 
+        WHERE key = %s AND service = %s AND status = 'PROCESSING'
+        """
+        
+        result = key_system.execute_query(check_query, (process_id, service_name))
+        
+        if not result or len(result) == 0:
+            log_info(f"🚫 Anti-Sharing: Process {process_id} not found or invalid for service {service_name}")
+            return jsonify({'success': False, 'error': 'Invalid process session'}), 404
+        
+        row = result[0]
+        db_id = row[0]
+        db_key = row[1]
+        db_hwid = row[2]
+        db_ip = row[3]
+        db_session_ip_hwid = row[4]
+        session_locked = row[5]
+        verification_steps = row[6] if len(row) > 6 else 0
+        
+        # ANTI-SHARING: Kiểm tra IP+HWID khớp
+        if db_session_ip_hwid != session_ip_hwid:
+            log_info(f"🚫 Anti-Sharing: Process {process_id} access denied. DB IP+HWID: {db_session_ip_hwid}, Request: {session_ip_hwid}")
+            
+            # Xóa session này và tất cả sessions của IP+HWID này
+            delete_sessions_query = """
+            DELETE FROM user_sessions 
+            WHERE session_ip_hwid = %s OR (ip_address = %s AND hwid = %s)
+            """
+            
+            key_system.execute_query(delete_sessions_query, (db_session_ip_hwid, ip_address, hwid))
+            
+            return jsonify({
+                'success': False,
+                'error': 'Phát hiện nhảy cóc hoặc thay đổi thiết bị/mạng. Tiến trình đã bị hủy.',
+                'code': 'SESSION_SHARING_DETECTED',
+                'action': 'restart_process'
+            }), 403
+        
+        # ANTI-SHARING: Kiểm tra session bị lock
+        if session_locked:
+            log_info(f"🚫 Anti-Sharing: Process {process_id} is locked. Current HWID: {hwid}")
+            return jsonify({
+                'success': False,
+                'error': 'This session is locked. Please start a new process.',
+                'code': 'SESSION_LOCKED'
+            }), 403
+        
+        # Cập nhật session thành completed
+        update_query = """
+        UPDATE user_sessions 
+        SET process_completed = TRUE, verification_steps = 4, status = 'COMPLETED',
+        updated_at = NOW()
+        WHERE id = %s
+        """
+        
+        key_system.execute_query(update_query, (db_id,))
+        
+        log_info(f"✅ Anti-Sharing: Process {process_id} completed successfully for {service_name}. HWID: {hwid}")
+        
+        return jsonify({
+            'success': True,
+            'processId': process_id,
+            'service': service_name,
+            'duration': duration,
+            'message': 'Verification process completed. You can now get your key.'
+        })
+        
+    except Exception as e:
+        log_error(f"Complete process error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/generate-key', methods=['POST'])
+def generate_final_key():
+    """Generate final key after process completion"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        service_name = data.get('service')
+        duration = data.get('duration')
+        
+        if not service_name or not duration:
+            return jsonify({'success': False, 'error': 'Missing service or duration'}), 400
+        
+        # Lấy user info
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        hwid = extract_hwid()
+        session_ip_hwid = f"{ip_address}_{hwid}"
+        
+        # Kiểm tra process đã hoàn thành
+        check_query = """
+        SELECT id, session_ip_hwid, process_completed, verification_steps
+        FROM user_sessions 
+        WHERE service = %s AND status = 'COMPLETED' AND hwid = %s
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+        
+        result = key_system.execute_query(check_query, (service_name, hwid))
+        
+        if not result or len(result) == 0:
+            log_info(f"🚫 Anti-Sharing: No completed process found for {service_name}, HWID: {hwid}")
+            return jsonify({'success': False, 'error': 'No completed verification process found'}), 404
+        
+        row = result[0]
+        db_id = row[0]
+        db_session_ip_hwid = row[1]
+        process_completed = row[2]
+        verification_steps = row[3] if len(row) > 3 else 0
+        
+        # ANTI-SHARING: Kiểm tra IP+HWID khớp
+        if db_session_ip_hwid != session_ip_hwid:
+            log_info(f"🚫 Anti-Sharing: Key generation denied for {service_name}. DB IP+HWID: {db_session_ip_hwid}, Request: {session_ip_hwid}")
+            
+            # Xóa tất cả sessions của IP+HWID này
+            delete_sessions_query = """
+            DELETE FROM user_sessions 
+            WHERE session_ip_hwid = %s OR (ip_address = %s AND hwid = %s)
+            """
+            
+            key_system.execute_query(delete_sessions_query, (db_session_ip_hwid, ip_address, hwid))
+            
+            return jsonify({
+                'success': False,
+                'error': 'Phát hiện nhảy cóc hoặc thay đổi thiết bị/mạng. Tiến trình đã bị hủy.',
+                'code': 'SESSION_SHARING_DETECTED',
+                'action': 'restart_process'
+            }), 403
+        
+        if not process_completed:
+            log_info(f"🚫 Anti-Sharing: Process not completed for {service_name}, HWID: {hwid}")
+            return jsonify({'success': False, 'error': 'Verification process not completed'}), 403
+        
+        # Tạo key cuối cùng
+        import random
+        import string
+        random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+        final_key = f"KHOA-{random_part}"
+        
+        # Tính thời gian hết hạn theo duration
+        current_time = int(time.time())
+        if duration == '2h':
+            expire_ts = current_time + (2 * 60 * 60)
+        elif duration == '24h':
+            expire_ts = current_time + (24 * 60 * 60)
+        elif duration == '7d':
+            expire_ts = current_time + (7 * 24 * 60 * 60)
+        else:
+            expire_ts = current_time + (24 * 60 * 60)  # Default 24h
+        
+        # Cập nhật session với key cuối cùng
+        update_query = """
+        UPDATE user_sessions 
+        SET key = %s, status = 'ACTIVE', expire_ts = %s, updated_at = NOW()
+        WHERE id = %s
+        """
+        
+        key_system.execute_query(update_query, (final_key, expire_ts, db_id))
+        
+        log_info(f"✅ Anti-Sharing: Final key generated for {service_name}. Key: {final_key}, HWID: {hwid}")
+        
+        return jsonify({
+            'success': True,
+            'keyId': final_key,
+            'key': final_key,
+            'service': service_name,
+            'duration': duration,
+            'expireTs': expire_ts,
+            'message': 'Key generated successfully'
+        })
+        
+    except Exception as e:
+        log_error(f"Generate key error: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/track-service-access', methods=['POST'])
 def track_service_access():
