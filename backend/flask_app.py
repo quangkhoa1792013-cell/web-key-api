@@ -38,28 +38,74 @@ CORS(app,
      supports_credentials=True)
 
 def log_info(info_message):
-    """Ghi thông tin ra console"""
+    """Ghi thông tin ra console với INFO level"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {info_message}")
+    print(f"[{timestamp}] INFO: {info_message}")
     logging.info(info_message)
 
 def log_error(error_message):
-    """Ghi lỗi ra console"""
+    """Ghi lỗi ra console với ERROR level"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {error_message}")
+    print(f"[{timestamp}] ERROR: {error_message}")
     logging.error(error_message)
 
 def log_recon(recon_message):
-    """Ghi bản tin trinh sát ra console - không dùng logging.error"""
+    """Ghi bản tin trinh sát ra console với format nhất quán"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {recon_message}")
-    # Không gọi logging.error() để tránh hiển thị ERROR level
+    print(f"[{timestamp}] RECON: {recon_message}")
+    # Không dùng logging module để tránh hiển thị ERROR level
 
 def log_radar(radar_message):
-    """Ghi radar log ra console - không dùng logging.error"""
+    """Ghi radar log ra console với format nhất quán"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {radar_message}")
-    # Không gọi logging.error() để tránh hiển thị ERROR level
+    print(f"[{timestamp}] RADAR: {radar_message}")
+    # Không dùng logging module để tránh hiển thị ERROR level
+
+def extract_hwid():
+    """Extract HWID from multiple sources with fallback"""
+    # 1. Try header first (most reliable)
+    hwid = request.headers.get('X-HWID')
+    if hwid and hwid != 'UNKNOWN':
+        return hwid
+    
+    # 2. Try alternative header formats
+    hwid = request.headers.get('X-hwid')
+    if hwid and hwid != 'UNKNOWN':
+        return hwid
+    
+    hwid = request.headers.get('hwid')
+    if hwid and hwid != 'UNKNOWN':
+        return hwid
+    
+    # 3. Try query parameters
+    hwid = request.args.get('hwid')
+    if hwid and hwid != 'UNKNOWN':
+        return hwid
+    
+    # 4. Try JSON body for POST requests
+    if request.is_json:
+        data = request.get_json(silent=True)
+        if data and isinstance(data, dict):
+            hwid = data.get('hwid')
+            if hwid and hwid != 'UNKNOWN':
+                return hwid
+    
+    # 5. Try cookies
+    hwid = request.cookies.get('hwid')
+    if hwid and hwid != 'UNKNOWN':
+        return hwid
+    
+    # 6. Generate fallback HWID based on IP and User-Agent
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    user_agent = request.headers.get('User-Agent', 'Unknown')
+    
+    # Create consistent HWID from IP + User-Agent hash
+    import hashlib
+    hwid_seed = f"{ip}_{user_agent}"
+    hwid_hash = hashlib.md5(hwid_seed.encode()).hexdigest()[:12].upper()
+    fallback_hwid = f"HWID_FALLBACK_{hwid_hash}"
+    
+    return fallback_hwid
 
 class NeonKeySystem:
     def __init__(self):
@@ -104,40 +150,66 @@ class NeonKeySystem:
             return None
     
     def connect_db(self):
-        """Kết nối đến Neon Database với psycopg2"""
+        """Kết nối đến Neon Database với psycopg2 với enhanced timeout và retry"""
         if not self.db_config:
             log_error("No database configuration available")
             return False
         
-        try:
-            if self.conn:
-                self.conn.close()
-            
-            self.conn = psycopg2.connect(
-                host=self.db_config['host'],
-                port=self.db_config['port'],
-                database=self.db_config['database'],
-                user=self.db_config['user'],
-                password=self.db_config['password'],
-                sslmode=self.db_config['sslmode'],
-                connect_timeout=10
-            )
-            
-            self.conn.autocommit = True
-            
-            # Test connection
-            with self.conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-            
-            log_info("✅ Database connection successful!")
-            return True
-            
-        except Exception as e:
-            log_error(f"❌ DATABASE CONNECTION ERROR: {e}")
-            log_error(f"CONNECTION TYPE: {type(e).__name__}")
-            self.conn = None
-            return False
+        max_connection_attempts = 3
+        for attempt in range(max_connection_attempts):
+            try:
+                if self.conn:
+                    self.conn.close()
+                
+                self.conn = psycopg2.connect(
+                    host=self.db_config['host'],
+                    port=self.db_config['port'],
+                    database=self.db_config['database'],
+                    user=self.db_config['user'],
+                    password=self.db_config['password'],
+                    sslmode=self.db_config['sslmode'],
+                    connect_timeout=15,  # Increased timeout
+                    application_name='roblox_key_system',
+                    keepalives=1,  # Enable TCP keepalives
+                    keepalives_idle=30,  # 30 seconds idle before keepalive
+                    keepalives_interval=10,  # 10 seconds between keepalives
+                    keepalives_count=3  # 3 keepalive attempts
+                )
+                
+                self.conn.autocommit = True
+                
+                # Test connection with simple query
+                with self.conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+                    cursor.fetchone()
+                
+                log_info("✅ Database connection successful!")
+                return True
+                
+            except psycopg2.OperationalError as e:
+                if "SSL connection has been closed unexpectedly" in str(e):
+                    log_info(f"🔄 SSL connection issue on attempt {attempt + 1}/{max_connection_attempts}, retrying...")
+                else:
+                    log_error(f"❌ DATABASE CONNECTION ERROR (Attempt {attempt + 1}/{max_connection_attempts}): {e}")
+                
+                if attempt == max_connection_attempts - 1:
+                    log_error(f"❌ Failed to connect after {max_connection_attempts} attempts")
+                    self.conn = None
+                    return False
+                
+                time.sleep(2 ** attempt)  # Exponential backoff
+                
+            except Exception as e:
+                log_error(f"❌ DATABASE CONNECTION ERROR (Attempt {attempt + 1}/{max_connection_attempts}): {e}")
+                log_error(f"CONNECTION TYPE: {type(e).__name__}")
+                
+                if attempt == max_connection_attempts - 1:
+                    self.conn = None
+                    return False
+                
+                time.sleep(2 ** attempt)  # Exponential backoff
+        
+        return False
     
     def init_tables(self):
         """Auto-create tables"""
@@ -180,46 +252,81 @@ class NeonKeySystem:
             log_error(f"Traceback: {traceback.format_exc()}")
             return False
     
-    def execute_query(self, query, params=None):
-        """Execute query với psycopg2"""
-        try:
-            # Kiểm tra kết nối database
-            if not self.conn or (hasattr(self.conn, 'closed') and self.conn.closed != 0):
-                log_error(f"🔄 Database connection lost, attempting to reconnect...")
-                if not self.connect_db():
-                    log_error(f"❌ Failed to reconnect to database")
-                    return None
-            
-            with self.conn.cursor() as cursor:
-                if params:
-                    # Ensure params is always a tuple for psycopg2
-                    if not isinstance(params, tuple):
-                        params = tuple(params) if isinstance(params, (list, tuple)) else (params,)
-                    cursor.execute(query, params)
-                else:
-                    cursor.execute(query)
+    def execute_query(self, query, params=None, max_retries=3):
+        """Execute query với robust retry mechanism"""
+        for attempt in range(max_retries):
+            try:
+                # Kiểm tra kết nối database
+                if not self.conn or (hasattr(self.conn, 'closed') and self.conn.closed != 0):
+                    log_info(f"🔄 Database connection lost, attempting to reconnect... (Attempt {attempt + 1}/{max_retries})")
+                    if not self.connect_db():
+                        log_error(f"❌ Failed to reconnect to database (Attempt {attempt + 1}/{max_retries})")
+                        if attempt == max_retries - 1:
+                            return None
+                        time.sleep(1)  # Wait before retry
+                        continue
                 
-                if query.strip().upper().startswith('SELECT') or 'RETURNING' in query.upper():
-                    result = cursor.fetchall()
-                    return result
-                else:
-                    return cursor.rowcount
+                with self.conn.cursor() as cursor:
+                    if params:
+                        # Ensure params is always a tuple for psycopg2
+                        if not isinstance(params, tuple):
+                            params = tuple(params) if isinstance(params, (list, tuple)) else (params,)
+                        cursor.execute(query, params)
+                    else:
+                        cursor.execute(query)
                     
-        except psycopg2.InterfaceError as e:
-            log_error(f"🔄 InterfaceError detected: {e}")
-            log_error(f"🔄 Attempting to reconnect...")
-            self.conn = None
-            if self.connect_db():
-                log_error(f"✅ Reconnected successfully, retrying query...")
-                return self.execute_query(query, params)  # Retry query after reconnection
-            else:
-                log_error(f"❌ Failed to reconnect after InterfaceError")
-                return None
-        except Exception as e:
-            log_error(f"❌ Query error: {e}")
-            log_error(f"Query: {query[:100]}...")
-            log_error(f"Traceback: {traceback.format_exc()}")
-            return None
+                    if query.strip().upper().startswith('SELECT') or 'RETURNING' in query.upper():
+                        result = cursor.fetchall()
+                        return result
+                    else:
+                        return cursor.rowcount
+                        
+            except psycopg2.OperationalError as e:
+                if "SSL connection has been closed unexpectedly" in str(e):
+                    log_info(f"🔄 SSL connection closed, attempting to reconnect... (Attempt {attempt + 1}/{max_retries})")
+                    self.conn = None
+                    if attempt == max_retries - 1:
+                        log_error(f"❌ Failed to reconnect after SSL connection closed (Attempt {attempt + 1}/{max_retries})")
+                        return None
+                    time.sleep(2)  # Wait longer for SSL issues
+                    continue
+                else:
+                    log_error(f"❌ OperationalError: {e}")
+                    if attempt == max_retries - 1:
+                        return None
+                    time.sleep(1)
+                    continue
+                    
+            except psycopg2.InterfaceError as e:
+                log_info(f"🔄 InterfaceError detected: {e} (Attempt {attempt + 1}/{max_retries})")
+                log_info(f"🔄 Attempting to reconnect...")
+                self.conn = None
+                if self.connect_db():
+                    log_info(f"✅ Reconnected successfully, retrying query... (Attempt {attempt + 1}/{max_retries})")
+                    continue
+                else:
+                    log_error(f"❌ Failed to reconnect after InterfaceError (Attempt {attempt + 1}/{max_retries})")
+                    if attempt == max_retries - 1:
+                        return None
+                    time.sleep(1)
+                    continue
+                    
+            except psycopg2.DatabaseError as e:
+                log_error(f"❌ DatabaseError: {e}")
+                if attempt == max_retries - 1:
+                    return None
+                time.sleep(1)
+                continue
+                
+            except Exception as e:
+                log_error(f"❌ Unexpected error in execute_query: {e}")
+                log_error(f"Traceback: {traceback.format_exc()}")
+                if attempt == max_retries - 1:
+                    return None
+                time.sleep(1)
+                continue
+        
+        return None
 
 def auto_generate_key(service, ip_address):
     """Tự động tạo key mới khi user chưa có key"""
@@ -388,11 +495,14 @@ def mark_session():
         service_id = data.get('serviceId')
         random_id = data.get('randomId')
         
+        # Lấy HWID từ nhiều nguồn
+        hwid = extract_hwid()
+        
         # Lấy URL từ request.referrer hoặc origin
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
         
         # Log bản tin trinh sát
-        log_recon(f"[RECON] | IP: {ip_address} | HWID: {data.get('hwid', 'UNKNOWN')} | ACTION: MARK_SESSION | SERVICE: {service_id} | URL: {target_url}")
+        log_recon(f"[RECON] | IP: {ip_address} | HWID: {hwid} | ACTION: MARK_SESSION | SERVICE: {service_id} | URL: {target_url}")
         
         # Validate data
         if not service_id or not random_id:
@@ -476,7 +586,8 @@ def check_key_status():
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
         
         service = request.args.get('service', 'lootlab')
-        request_hwid = request.headers.get('X-HWID', 'UNKNOWN')
+        # Lấy HWID từ nhiều nguồn
+        request_hwid = extract_hwid()
         
         # Lấy URL từ request.referrer hoặc origin
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
@@ -722,7 +833,7 @@ def get_key():
                 'created_at': row[7].isoformat() if row[7] else None
             }
             
-            log_error(f"✅ Key found: {key_id}")
+            log_info(f"✅ Key found: {key_id}")
             return jsonify({
                 'success': True,
                 'key': key_data
@@ -819,6 +930,135 @@ def delete_session():
     except Exception as e:
         log_error(f"[RADAR] Delete session error: {e}")
         log_error(f"[RADAR] Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/<path:service_path>', methods=['GET'])
+def handle_service_redirect(service_path):
+    """Handle service redirects like /worklink-15ecz4e9 and log under [RECON]"""
+    try:
+        # Extract service name from path (e.g., "worklink" from "worklink-15ecz4e9")
+        service_name = service_path.split('-')[0] if '-' in service_path else service_path
+        random_id = service_path.split('-')[1] if '-' in service_path else None
+        
+        # Lấy user_agent
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # Lấy IP từ X-Forwarded-For hoặc remote_addr
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        
+        # Lấy HWID từ nhiều nguồn
+        hwid = extract_hwid()
+        
+        # Lấy URL từ request.referrer hoặc origin
+        target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
+        
+        # Log bản tin trinh sát cho service access
+        log_recon(f"[RECON] | IP: {ip_address} | HWID: {hwid} | ACTION: SERVICE_ACCESS | SERVICE: {service_name} | URL: {target_url} | PATH: /{service_path}")
+        
+        # Check if user has valid key for this service
+        if not key_system:
+            return jsonify({
+                'error': 'Service temporarily unavailable',
+                'message': 'Please try again later'
+            }), 503
+        
+        # Check key status for this service
+        check_query = """
+        SELECT key, expire_ts, status, hwid
+        FROM user_sessions 
+        WHERE service = %s AND key LIKE 'KHOA-%%' AND status = 'ACTIVE' AND expire_ts > %s
+        ORDER BY expire_ts DESC
+        LIMIT 1
+        """
+        
+        current_time = int(time.time())
+        result = key_system.execute_query(check_query, (service_name, current_time))
+        
+        if result and len(result) > 0:
+            row = result[0]
+            key_value = row[0]
+            expire_ts = row[1]
+            status = row[2]
+            db_hwid = row[3]
+            
+            # Check HWID compatibility
+            if db_hwid and db_hwid != 'UNKNOWN' and db_hwid != hwid:
+                if db_hwid == "AUTO_GENERATED":
+                    return jsonify({
+                        'status': 'hwid_required',
+                        'message': 'HWID verification required',
+                        'service': service_name,
+                        'key': key_value,
+                        'expireTs': expire_ts,
+                        'currentTime': current_time
+                    }), 200
+                else:
+                    return jsonify({
+                        'status': 'device_mismatch',
+                        'message': 'Device not authorized for this service',
+                        'service': service_name
+                    }), 403
+            
+            # Valid key found - create session
+            session_token = f"session_{key_value}_{int(time.time())}"
+            
+            # Redirect to frontend with session info
+            frontend_url = f"http://localhost:5173/{service_path}?session={session_token}&service={service_name}"
+            
+            return redirect(frontend_url)
+            
+        else:
+            # No valid key found
+            return jsonify({
+                'status': 'no_key',
+                'message': 'No valid key found for this service',
+                'service': service_name,
+                'action': 'get_key'
+            }), 200
+            
+    except Exception as e:
+        log_error(f"Service redirect error for /{service_path}: {e}")
+        log_error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': 'Service access failed',
+            'message': 'Please try again later'
+        }), 500
+
+@app.route('/api/track-service-access', methods=['POST'])
+def track_service_access():
+    """Track service access when frontend loads"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        # Lấy user_agent
+        user_agent = request.headers.get('User-Agent', 'Unknown')
+        
+        # Lấy IP từ X-Forwarded-For hoặc remote_addr
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        
+        # Lấy HWID từ nhiều nguồn
+        hwid = extract_hwid()
+        
+        data = request.get_json()
+        service_name = data.get('service')
+        path = data.get('path')
+        
+        # Lấy URL từ request.referrer hoặc origin
+        target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
+        
+        # Log bản tin trinh sát
+        log_recon(f"[RECON] | IP: {ip_address} | HWID: {hwid} | ACTION: FRONTEND_LOADED | SERVICE: {service_name} | URL: {target_url} | PATH: {path}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Service access tracked',
+            'service': service_name,
+            'hwid': hwid
+        })
+        
+    except Exception as e:
+        log_error(f"Track service access error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/check-session-mark', methods=['POST'])
