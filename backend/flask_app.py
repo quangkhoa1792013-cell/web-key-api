@@ -37,7 +37,7 @@ CORS(app,
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
 
-def log_msg(message):
+def log_info(message):
     """Universal logging function with intelligent level detection"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -49,14 +49,14 @@ def log_msg(message):
     message_lower = message.lower()
     
     if any(keyword.lower() in message_lower for keyword in traceback_keywords):
-        # Always use error level for traceback/exception messages
+        # Always use ERROR cho Traceback/Exception
         logging.error(f"[{timestamp}] ERROR: {message}")
     elif any(keyword.lower() in message_lower for keyword in success_keywords):
         logging.info(f"[{timestamp}] INFO: {message}")
     elif any(keyword.lower() in message_lower for keyword in error_keywords):
         logging.error(f"[{timestamp}] ERROR: {message}")
     else:
-        # Default to info for general messages
+        # Default to info cho general messages
         logging.info(f"[{timestamp}] INFO: {message}")
 
 def log_recon(recon_message):
@@ -116,7 +116,7 @@ def extract_hwid():
     hwid_hash = hashlib.md5(hwid_seed.encode()).hexdigest()[:8].upper()
     temp_hwid = f"TEMP_{hwid_hash}"
     
-    log_msg(f"🔄 Using temporary HWID for unknown device: {temp_hwid} (IP: {ip})")
+    log_info(f"🔄 Using temporary HWID for unknown device: {temp_hwid} (IP: {ip})")
     
     return temp_hwid
 
@@ -133,13 +133,13 @@ class NeonKeySystem:
             # Sử dụng biến môi trường DATABASE_URL
             db_url = os.environ.get('DATABASE_URL')
             if not db_url:
-                log_error("DATABASE_URL not found in environment variables")
+                log_info("DATABASE_URL not found in environment variables")
                 return None
             
             # Chuyển postgres:// thành postgresql:// cho psycopg2
             if db_url.startswith('postgres://'):
                 db_url = db_url.replace('postgres://', 'postgresql://', 1)
-                log_error(f"Converted postgres:// to postgresql:// for psycopg2 compatibility")
+                log_info(f"Converted postgres:// to postgresql:// for psycopg2 compatibility")
             
             parsed = urlparse(db_url)
             
@@ -159,13 +159,13 @@ class NeonKeySystem:
             return config
             
         except Exception as e:
-            log_error(f"Failed to parse DATABASE_URL: {e}")
+            log_info(f"Failed to parse DATABASE_URL: {e}")
             return None
     
     def connect_db(self):
         """Kết nối đến Neon Database với psycopg2 với enhanced timeout và retry"""
         if not self.db_config:
-            log_error("No database configuration available")
+            log_info("No database configuration available")
             return False
         
         max_connection_attempts = 3
@@ -203,18 +203,18 @@ class NeonKeySystem:
                 if "SSL connection has been closed unexpectedly" in str(e):
                     log_info(f"🔄 SSL connection issue on attempt {attempt + 1}/{max_connection_attempts}, retrying...")
                 else:
-                    log_error(f"❌ DATABASE CONNECTION ERROR (Attempt {attempt + 1}/{max_connection_attempts}): {e}")
+                    log_info(f"❌ DATABASE CONNECTION ERROR (Attempt {attempt + 1}/{max_connection_attempts}): {e}")
                 
                 if attempt == max_connection_attempts - 1:
-                    log_error(f"❌ Failed to connect after {max_connection_attempts} attempts")
+                    log_info(f"❌ Failed to connect after {max_connection_attempts} attempts")
                     self.conn = None
                     return False
                 
                 time.sleep(2 ** attempt)  # Exponential backoff
                 
             except Exception as e:
-                log_error(f"❌ DATABASE CONNECTION ERROR (Attempt {attempt + 1}/{max_connection_attempts}): {e}")
-                log_error(f"CONNECTION TYPE: {type(e).__name__}")
+                log_info(f"❌ DATABASE CONNECTION ERROR (Attempt {attempt + 1}/{max_connection_attempts}): {e}")
+                log_info(f"CONNECTION TYPE: {type(e).__name__}")
                 
                 if attempt == max_connection_attempts - 1:
                     self.conn = None
@@ -227,7 +227,7 @@ class NeonKeySystem:
     def init_tables(self):
         """Auto-create tables with anti-skipping columns"""
         if not self.conn:
-            log_error("Cannot create tables - no database connection")
+            log_info("Cannot create tables - no database connection")
             return False
         
         try:
@@ -266,15 +266,19 @@ class NeonKeySystem:
             return True
             
         except Exception as e:
-            log_error(f"❌ Failed to create tables: {e}")
-            log_error(f"Traceback: {traceback.format_exc()}")
+            log_info(f"❌ Failed to create tables: {e}")
+            log_info(f"Traceback: {traceback.format_exc()}")
             return False
     
     def add_missing_columns(self):
         """Add missing columns to existing user_sessions table"""
         try:
             with self.conn.cursor() as cursor:
-                # Check existing columns
+                # Add process_completed column directly with IF NOT EXISTS
+                cursor.execute("ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS process_completed BOOLEAN DEFAULT FALSE")
+                log_info("✅ Added process_completed column if not exists")
+                
+                # Check existing columns for other columns
                 cursor.execute("""
                     SELECT column_name 
                     FROM information_schema.columns 
@@ -283,18 +287,17 @@ class NeonKeySystem:
                 """)
                 existing_columns = [row[0] for row in cursor.fetchall()]
                 
-                # Add missing columns
+                # Add other missing columns
                 columns_to_add = {
-                    'process_completed': 'BOOLEAN DEFAULT FALSE',
                     'verification_steps': 'INTEGER DEFAULT 0',
                     'session_ip_hwid': 'VARCHAR(255)',
                     'session_locked': 'BOOLEAN DEFAULT FALSE',
-                    'session_token': 'VARCHAR(255)'  # Add session_token column
+                    'session_token': 'VARCHAR(255)'
                 }
                 
                 for column_name, column_def in columns_to_add.items():
                     if column_name not in existing_columns:
-                        alter_query = f"ALTER TABLE user_sessions ADD COLUMN {column_name} {column_def}"
+                        alter_query = f"ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS {column_name} {column_def}"
                         cursor.execute(alter_query)
                         log_info(f"✅ Added missing column: {column_name}")
                 
@@ -302,7 +305,7 @@ class NeonKeySystem:
                 self.conn.commit()
                 
         except Exception as e:
-            log_msg(f"❌ Failed to add missing columns: {e}")
+            log_info(f"❌ Failed to add missing columns: {e}")
             # Don't return False here, as table might already exist
     
     def create_indexes(self):
@@ -341,7 +344,7 @@ class NeonKeySystem:
                 if not self.conn or (hasattr(self.conn, 'closed') and self.conn.closed != 0):
                     log_info(f"🔄 Database connection lost, attempting to reconnect... (Attempt {attempt + 1}/{max_retries})")
                     if not self.connect_db():
-                        log_error(f"❌ Failed to reconnect to database (Attempt {attempt + 1}/{max_retries})")
+                        log_info(f"❌ Failed to reconnect to database (Attempt {attempt + 1}/{max_retries})")
                         if attempt == max_retries - 1:
                             return None
                         time.sleep(1)  # Wait before retry
@@ -367,12 +370,12 @@ class NeonKeySystem:
                     log_info(f"🔄 SSL connection closed, attempting to reconnect... (Attempt {attempt + 1}/{max_retries})")
                     self.conn = None
                     if attempt == max_retries - 1:
-                        log_error(f"❌ Failed to reconnect after SSL connection closed (Attempt {attempt + 1}/{max_retries})")
+                        log_info(f"❌ Failed to reconnect after SSL connection closed (Attempt {attempt + 1}/{max_retries})")
                         return None
                     time.sleep(2)  # Wait longer for SSL issues
                     continue
                 else:
-                    log_error(f"❌ OperationalError: {e}")
+                    log_info(f"❌ OperationalError: {e}")
                     if attempt == max_retries - 1:
                         return None
                     time.sleep(1)
@@ -386,22 +389,22 @@ class NeonKeySystem:
                     log_info(f"✅ Reconnected successfully, retrying query... (Attempt {attempt + 1}/{max_retries})")
                     continue
                 else:
-                    log_error(f"❌ Failed to reconnect after InterfaceError (Attempt {attempt + 1}/{max_retries})")
+                    log_info(f"❌ Failed to reconnect after InterfaceError (Attempt {attempt + 1}/{max_retries})")
                     if attempt == max_retries - 1:
                         return None
                     time.sleep(1)
                     continue
                     
             except psycopg2.DatabaseError as e:
-                log_error(f"❌ DatabaseError: {e}")
+                log_info(f"❌ DatabaseError: {e}")
                 if attempt == max_retries - 1:
                     return None
                 time.sleep(1)
                 continue
                 
             except Exception as e:
-                log_error(f"❌ Unexpected error in execute_query: {e}")
-                log_error(f"Traceback: {traceback.format_exc()}")
+                log_info(f"❌ Unexpected error in execute_query: {e}")
+                log_info(f"Traceback: {traceback.format_exc()}")
                 if attempt == max_retries - 1:
                     return None
                 time.sleep(1)
@@ -446,23 +449,23 @@ def auto_generate_key(service, ip_address):
             log_info(f"✅ Auto-generated key: {created_key} for service: {service}")
             return created_key
         else:
-            log_error(f"❌ Failed to auto-generate key for service: {service}")
+            log_info(f"❌ Failed to auto-generate key for service: {service}")
             return None
             
     except Exception as e:
-        log_error(f"❌ Auto-generate key error: {e}")
+        log_info(f"❌ Auto-generate key error: {e}")
         return None
 
 # Initialize key system
 try:
-    log_error("=== STARTING DATABASE INITIALIZATION ===")
+    log_info("=== STARTING DATABASE INITIALIZATION ===")
     key_system = NeonKeySystem()
     if key_system and key_system.conn:
-        log_error("✅ Database connected successfully - Ready to execute queries")
+        log_info("✅ Database connected successfully - Ready to execute queries")
     else:
-        log_error("❌ Database connection failed")
+        log_info("❌ Database connection failed")
 except Exception as e:
-    log_error(f"❌ Failed to initialize database: {e}")
+    log_info(f"❌ Failed to initialize database: {e}")
 
 # Add radar logging before request handling
 @app.before_request
@@ -479,24 +482,23 @@ def radar_logging():
         if path.startswith('/api'):
             log_radar(f"[RADAR] {method} | {path} | HWID: {hwid} | IP: {ip}")
             
-            # Nếu nhận được HWID thì lưu ngay vào Database Neon
-            if hwid and hwid != 'UNKNOWN':
-                try:
-                    # Tìm session đang pending để cập nhật HWID
-                    update_query = """
-                    UPDATE user_sessions 
-                    SET hwid = %s, status = %s 
-                    WHERE hwid = 'UNKNOWN' OR hwid IS NULL
-                    AND key LIKE 'KHOA-%%'
-                    """
-                    
-                    params = (hwid, 'ACTIVE')
-                    key_system.execute_query(update_query, params)
-                    log_info(f"[RADAR] ✅ Updated HWID for pending sessions: {hwid}")
-                except Exception as e:
-                    log_error(f"[RADAR] ❌ Failed to update HWID: {e}")
+            # Luôn lưu HWID vào Database khi có thể (kể cả UNKNOWN)
+            try:
+                # Tìm session đang pending để cập nhật HWID
+                update_query = """
+                UPDATE user_sessions 
+                SET hwid = %s, status = %s 
+                WHERE hwid = 'UNKNOWN' OR hwid IS NULL
+                AND key LIKE 'KHOA-%%'
+                """
+                
+                params = (hwid, 'ACTIVE')
+                key_system.execute_query(update_query, params)
+                log_info(f"[RADAR] ✅ Updated HWID for pending sessions: {hwid}")
+            except Exception as e:
+                log_info(f"[RADAR] ❌ Failed to update HWID: {e}")
     except Exception as e:
-        log_error(f"[RADAR] Logging error: {e}")
+        log_info(f"[RADAR] Logging error: {e}")
 
 # Register radar function
 app.before_request(radar_logging)
@@ -553,7 +555,7 @@ def check_service_keys():
             })
             
     except Exception as e:
-        log_error(f"Service keys check error: {e}")
+        log_info(f"Service keys check error: {e}")
         return jsonify({'hasKey': False, 'count': 0, 'nextExpiry': None})
 
 @app.route('/api/mark-session', methods=['POST'])
@@ -639,18 +641,18 @@ def mark_session():
                 return jsonify({'success': False, 'error': 'Failed to mark session - database returned none'}), 500
                 
         except Exception as db_error:
-            log_error(f"Database insert error: {db_error}")
+            log_info(f"Database insert error: {db_error}")
             return jsonify({'success': False, 'error': 'Database insert failed'}), 500
             
     except ValueError as ve:
-        log_error(f"Value error in mark_session: {ve}")
+        log_info(f"Value error in mark_session: {ve}")
         return jsonify({'success': False, 'error': f'Invalid data format: {str(ve)}'}), 400
     except json.JSONDecodeError as je:
-        log_error(f"JSON decode error in mark_session: {je}")
+        log_info(f"JSON decode error in mark_session: {je}")
         return jsonify({'success': False, 'error': 'Invalid JSON format'}), 400
     except Exception as e:
-        log_error(f"Unexpected error in mark_session: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Unexpected error in mark_session: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/check-key-status', methods=['GET'])
@@ -773,8 +775,8 @@ def check_key_status():
             })
             
     except Exception as e:
-        log_error(f"Key status check error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Key status check error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'hasKey': False, 'status': 'error', 'error': str(e)})
 
 @app.route('/api/verify-session', methods=['POST'])
@@ -865,8 +867,8 @@ def verify_session():
             })
             
     except Exception as e:
-        log_error(f"Session verification error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Session verification error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'valid': False, 'error': str(e)})
 
 @app.route('/api/get-key', methods=['GET'])
@@ -920,15 +922,15 @@ def get_key():
                 'key': key_data
             })
         else:
-            log_error(f"❌ Key not found: {key_id}")
+            log_info(f"❌ Key not found: {key_id}")
             return jsonify({
                 'success': False,
                 'error': 'Key not found'
             }), 404
             
     except Exception as e:
-        log_error(f"Get key error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Get key error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 @app.route('/api/delete-session', methods=['POST'])
 def delete_session():
@@ -1009,8 +1011,8 @@ def delete_session():
             }), 404
             
     except Exception as e:
-        log_error(f"[RADAR] Delete session error: {e}")
-        log_error(f"[RADAR] Traceback: {traceback.format_exc()}")
+        log_info(f"[RADAR] Delete session error: {e}")
+        log_info(f"[RADAR] Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/<path:service_path>', methods=['GET'])
@@ -1114,8 +1116,8 @@ def handle_service_redirect(service_path):
             return redirect(f"/{service_name}")
             
     except Exception as e:
-        log_error(f"Service redirect error for /{service_path}: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Service redirect error for /{service_path}: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({
             'error': 'Service access failed',
             'message': 'Please try again later'
@@ -1222,7 +1224,7 @@ def validate_key_access(key_id, service_name, hwid, ip_address, target_url):
         return redirect(f"/{service_name}/key-{key_id}")
         
     except Exception as e:
-        log_error(f"Key validation error: {e}")
+        log_info(f"Key validation error: {e}")
         return jsonify({
             'status': 'validation_error',
             'message': 'Key validation failed',
@@ -1300,12 +1302,12 @@ def mark_session_start():
                 'message': 'Verification process started successfully'
             })
         else:
-            log_error(f"❌ Failed to start verification process for {service_name}")
+            log_info(f"❌ Failed to start verification process for {service_name}")
             return jsonify({'success': False, 'error': 'Failed to start process'}), 500
             
     except Exception as e:
-        log_error(f"Mark session error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Mark session error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/start-process', methods=['POST'])
@@ -1383,12 +1385,12 @@ def start_verification_process():
                 'message': 'Verification process started successfully'
             })
         else:
-            log_error(f"❌ Failed to start verification process for {service_name}")
+            log_info(f"❌ Failed to start verification process for {service_name}")
             return jsonify({'success': False, 'error': 'Failed to start process'}), 500
             
     except Exception as e:
-        log_error(f"Start process error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Start process error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/complete-process', methods=['POST'])
@@ -1483,8 +1485,8 @@ def complete_verification_process():
         })
         
     except Exception as e:
-        log_error(f"Complete process error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Complete process error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/generate-key', methods=['POST'])
@@ -1590,8 +1592,8 @@ def generate_final_key():
         })
         
     except Exception as e:
-        log_error(f"Generate key error: {e}")
-        log_error(f"Traceback: {traceback.format_exc()}")
+        log_info(f"Generate key error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/track-service-access', methods=['POST'])
@@ -1628,7 +1630,7 @@ def track_service_access():
         })
         
     except Exception as e:
-        log_error(f"Track service access error: {e}")
+        log_info(f"Track service access error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/check-session-mark', methods=['POST'])
@@ -1671,7 +1673,7 @@ def check_session_mark():
             })
             
     except Exception as e:
-        log_error(f"Session check error: {e}")
+        log_info(f"Session check error: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/anti-cheat-check', methods=['POST'])
@@ -1710,7 +1712,7 @@ def anti_cheat_check():
         })
         
     except Exception as e:
-        log_error(f"Anti-cheat check error: {e}")
+        log_info(f"Anti-cheat check error: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/', methods=['GET'])
@@ -1769,13 +1771,13 @@ def list_routes():
 
 # PythonAnywhere compatible - chỉ chạy app.run() khi local
 if __name__ == '__main__':
-    log_error("🚀 Starting Flask Application...")
-    log_error(f"📊 DATABASE_URL configured: {'Yes' if os.environ.get('DATABASE_URL') else 'No'}")
+    logging.info("🚀 Starting Flask Application...")
+    logging.info(f"📊 DATABASE_URL configured: {'Yes' if os.environ.get('DATABASE_URL') else 'No'}")
     
     if key_system and key_system.conn:
-        log_error("✅ Database test passed - Ready to serve!")
+        logging.info("✅ Database test passed - Ready to serve!")
     else:
-        log_error("❌ Database test failed - Check configuration")
+        logging.info("❌ Database test failed - Check configuration")
     
     app.run(host='0.0.0.0', port=7860, debug=False)
 

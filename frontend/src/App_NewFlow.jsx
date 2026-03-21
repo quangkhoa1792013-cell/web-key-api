@@ -65,7 +65,7 @@ function App() {
         
         {/* Trang kết quả key */}
         <Route 
-          path="/:service_name/key-:key_id" 
+          path="/:serviceId/key-:id" 
           element={
             <KeyResult 
               userSession={userSession}
