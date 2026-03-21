@@ -54,7 +54,7 @@ const Home = ({ setUserSession }) => {
         {services.map((service) => (
           <Link 
             key={service.name}
-            to={`/${service.name}`}
+            to={'/' + service.name}
             className="service-card"
             style={{ '--service-color': service.color }}
             onClick={() => handleServiceSelect(service.name)}

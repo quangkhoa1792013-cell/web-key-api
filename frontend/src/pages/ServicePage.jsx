@@ -60,12 +60,12 @@ const ServicePage = ({ setUserSession }) => {
       });
 
       // Navigate to link process page
-      navigate(`/${serviceId}/get-key&${selectedDuration}`);
+      navigate('/' + serviceId + '/get-key&' + selectedDuration);
       
     } catch (error) {
       console.error('Failed to start process:', error);
       // Still navigate on error
-      navigate(`/${serviceId}/get-key&${selectedDuration}`);
+      navigate('/' + serviceId + '/get-key&' + selectedDuration);
     } finally {
       setLoading(false);
     }
