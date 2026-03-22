@@ -560,7 +560,7 @@ def check_service_keys():
 
 @app.route('/api/mark-session', methods=['POST'])
 def mark_session():
-    """Mark session trước khi chuyển trang"""
+    """Mark session trước khi chuyển trang - chỉ dùng IP và HWID để định danh"""
     try:
         if not key_system:
             return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
@@ -576,7 +576,6 @@ def mark_session():
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
             
         service_id = data.get('serviceId')
-        random_id = data.get('randomId')
         
         # Lấy HWID từ nhiều nguồn
         hwid = extract_hwid()
@@ -584,40 +583,41 @@ def mark_session():
         # Lấy URL từ request.referrer hoặc origin
         target_url = request.referrer or request.headers.get('Origin') or 'DIRECT_ACCESS'
         
+        # Tạo session identifier từ IP + HWID
+        session_ip_hwid = f"{ip_address}_{hwid}"
+        import hashlib
+        import time
+        session_seed = f"{service_id}_{ip_address}_{hwid}_{int(time.time())}"
+        session_hash = hashlib.md5(session_seed.encode()).hexdigest()[:16].upper()
+        session_key = f"MARK_{session_hash}"
+        
         # Log bản tin trinh sát
         log_recon(f"[RECON] | IP: {ip_address} | HWID: {hwid} | ACTION: MARK_SESSION | SERVICE: {service_id} | URL: {target_url}")
         
         # Validate data
-        if not service_id or not random_id:
-            return jsonify({'success': False, 'error': 'Missing service or random ID'}), 400
-        
-        # Kiểm tra xem key có tồn tại không - chỉ dùng cột hiện có trong DB
-        check_query = """
-        SELECT key, expire_ts, status, service 
-        FROM user_sessions 
-        WHERE key = %s AND service = %s
-        """
-        
-        result = key_system.execute_query(check_query, (service_id + '-' + random_id, service_id))
+        if not service_id:
+            return jsonify({'success': False, 'error': 'Missing service ID'}), 400
         
         # Insert session marking
         try:
             insert_query = """
-            INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO user_sessions (key, service, status, ip_address, expire_ts, hwid, cookies, session_ip_hwid, session_locked)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, expire_ts
             """
             
             session_expire_ts = int(time.time()) + 1800  # 30 minutes
             
             params = (
-                service_id + '-' + random_id,
+                session_key,
                 service_id,
                 'PENDING',
                 ip_address,
                 session_expire_ts,
-                'PENDING_SESSION',
-                json.dumps({'ua': user_agent, 'marked_at': time.time()})
+                hwid,
+                json.dumps({'ua': user_agent, 'marked_at': time.time()}),
+                session_ip_hwid,
+                True
             )
             
             result = key_system.execute_query(insert_query, params)
@@ -632,7 +632,6 @@ def mark_session():
                 return jsonify({
                     'success': True,
                     'sessionId': session_id,
-                    'randomId': random_id,
                     'serviceId': service_id,
                     'expireTs': expire_ts,
                     'message': 'Session marked successfully'
@@ -1017,11 +1016,10 @@ def delete_session():
 
 @app.route('/<path:service_path>', methods=['GET'])
 def handle_service_redirect(service_path):
-    """Handle service redirects like /worklink-15ecz4e9 with anti-skipping protection"""
+    """Handle service redirects with anti-skipping protection - chỉ dùng service name"""
     try:
-        # Extract service name from path (e.g., "worklink" from "worklink-15ecz4e9")
+        # Extract service name from path
         service_name = service_path.split('-')[0] if '-' in service_path else service_path
-        random_id = service_path.split('-')[1] if '-' in service_path else None
         
         # Lấy user_agent
         user_agent = request.headers.get('User-Agent', 'Unknown')
@@ -1039,9 +1037,9 @@ def handle_service_redirect(service_path):
         log_recon(f"[RECON] | IP: {ip_address} | HWID: {hwid} | ACTION: SERVICE_ACCESS | SERVICE: {service_name} | URL: {target_url} | PATH: /{service_path}")
         
         # ANTI-SKIPPING: Check if this is a direct key access attempt
-        if random_id and random_id.startswith('key'):
+        if service_path.startswith('key-'):
             # This is a direct key access attempt - validate authorization
-            key_id = random_id[4:]  # Remove 'key-' prefix
+            key_id = service_path[4:]  # Remove 'key-' prefix
             return validate_key_access(key_id, service_name, hwid, ip_address, target_url)
         
         # Check if user has valid key for this service
@@ -1635,24 +1633,30 @@ def track_service_access():
 
 @app.route('/api/check-session-mark', methods=['POST'])
 def check_session_mark():
-    """Check session validity cho TimeSelectionPage"""
+    """Check session validity cho TimeSelectionPage - chỉ dùng IP + HWID"""
     try:
         if not key_system:
             return jsonify({'success': False, 'message': 'Key system not initialized'}), 500
         
         data = request.get_json()
-        random_id = data.get('randomId')
+        service_id = data.get('serviceId')
         
-        if not random_id:
-            return jsonify({'success': False, 'message': 'Missing randomId'}), 400
+        if not service_id:
+            return jsonify({'success': False, 'message': 'Missing service ID'}), 400
+        
+        # Lấy IP và HWID
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        hwid = extract_hwid()
+        session_ip_hwid = f"{ip_address}_{hwid}"
         
         check_query = """
         SELECT service, status, expire_ts FROM user_sessions 
-        WHERE key = %s AND expire_ts > %s
+        WHERE session_ip_hwid = %s AND service = %s AND expire_ts > %s
+        ORDER BY created_at DESC LIMIT 1
         """
         
         current_time = int(time.time())
-        result = key_system.execute_query(check_query, (random_id, current_time))
+        result = key_system.execute_query(check_query, (session_ip_hwid, service_id, current_time))
         
         if result:
             row = result[0]
