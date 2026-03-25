@@ -46,7 +46,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(var(--service-color), 0.1);
+  background: var(--service-color);
+  opacity: 0.1;
   border-radius: 12px;
 }
 
@@ -97,7 +98,8 @@
 
 .duration-card.selected {
   border-color: var(--service-color);
-  background: rgba(var(--service-color), 0.05);
+  background: var(--service-color);
+  opacity: 0.05;
 }
 
 .duration-header {
@@ -166,7 +168,8 @@
 
 .start-process-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(var(--service-color), 0.3);
+  box-shadow: 0 8px 25px var(--service-color);
+  opacity: 0.3;
 }
 
 .start-process-btn:disabled {
@@ -200,7 +203,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 1rem;
-  background: rgba(var(--service-color), 0.05);
+  background: var(--service-color);
+  opacity: 0.05;
   border-radius: 8px;
 }
 

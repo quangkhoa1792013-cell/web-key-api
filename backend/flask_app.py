@@ -34,7 +34,7 @@ CORS(app,
          r'^https://[a-zA-Z0-9-]+\.netlify\.app$'  # Regex cho tất cả netlify subdomains
      ],
      methods=['GET', 'POST', 'OPTIONS'],
-     allow_headers=['Content-Type', 'Authorization', 'x-user-agent'],
+     allow_headers=['Content-Type', 'Authorization', 'x-user-agent', 'x-timestamp'],
      supports_credentials=True)
 
 def log_info(message):

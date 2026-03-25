@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useSearchParams } from 'react-router-dom';
 import { Clock, Key, Copy, CheckCircle, ChevronRight, AlertCircle, ArrowLeft, Shield, Loader2, ExternalLink } from 'lucide-react';
 
 function LinkSkipPage() {
   const navigate = useNavigate();
   const params = useParams();
-  const [searchParams] = useSearchParams();
   
   // Get serviceId and time from URL params
   const { serviceId, time } = params;
@@ -23,6 +21,7 @@ function LinkSkipPage() {
   const [showCountdown, setShowCountdown] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [links, setLinks] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // BẢO MẬT NẠP FRONTEND - Validate session marking TRƯỚC KHI render
   useEffect(() => {
@@ -68,10 +67,10 @@ function LinkSkipPage() {
         }
       } catch (error) {
         console.error('[LinkSkip] ❌ Session validation failed:', error);
-        setValidationError('Lỗi kết nối đến server');
+        setValidationError('Không thể xác thực phiên. Vui lòng thử lại.');
         setTimeout(() => {
           navigate('/');
-        }, 2000);
+        }, 3000);
       } finally {
         setIsValidatingSession(false);
       }
@@ -100,52 +99,51 @@ function LinkSkipPage() {
     // Restore current step from localStorage if exists and is valid
     const savedStep = localStorage.getItem('currentStep');
     if (savedStep) {
-      const stepIndex = parseInt(savedStep);
-      if (stepIndex >= 0 && stepIndex < linkCount) {
-        // Restore completed links up to current step
-        const completed = [];
-        for (let i = 0; i < stepIndex; i++) {
-          completed.push(i);
-        }
-        setCompletedLinks(completed);
-        setCurrentLinkIndex(stepIndex);
+      const step = parseInt(savedStep);
+      if (step >= 0 && step < linkCount) {
+        setCurrentLinkIndex(step);
+        setCompletedLinks(Array(step).fill(true));
       }
     }
   };
 
-  const handleLinkClick = (linkIndex) => {
-    // Save current step to localStorage
-    localStorage.setItem('currentStep', linkIndex.toString());
+  const handleLinkClick = async (linkIndex) => {
+    if (isProcessing) return;
     
-    // Open link in new tab
-    const link = links[linkIndex];
-    window.open(link.url, '_blank');
+    setIsProcessing(true);
     
-    // Mark as completed after delay (simulating link completion)
-    setTimeout(() => {
-      setCompletedLinks(prev => [...prev, linkIndex]);
+    try {
+      // Simulate link processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      if (linkIndex === links.length - 1) {
-        // All links completed, show countdown
+      setCompletedLinks(prev => [...prev, true]);
+      setCurrentLinkIndex(prev => prev + 1);
+      localStorage.setItem('currentStep', linkIndex + 1);
+      
+      // Check if all links are completed
+      if (linkIndex + 1 >= links.length) {
         setShowCountdown(true);
         startCountdown();
-      } else {
-        // Move to next link
-        setCurrentLinkIndex(linkIndex + 1);
       }
-    }, 3000); // 3 seconds delay
+    } catch (error) {
+      console.error('Failed to process link:', error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const startCountdown = () => {
+    let count = 10;
+    setCountdown(count);
+    
     const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          finalizeKey();
-          return 0;
-        }
-        return prev - 1;
-      });
+      count--;
+      setCountdown(count);
+      
+      if (count <= 0) {
+        clearInterval(timer);
+        finalizeKey();
+      }
     }, 1000);
   };
 
@@ -165,12 +163,12 @@ function LinkSkipPage() {
   // Show loading while validating session
   if (isValidatingSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-indigo-950 flex items-center justify-center">
         <div className="text-center max-w-md">
-          <Loader2 className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-white mb-3">Đang kiểm tra phiên...</h2>
-          <p className="text-slate-400 mb-4">Xác thực đánh dấu trong Database</p>
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+          <div className="loading-spinner mx-auto mb-6"></div>
+          <h2 className="text-2xl font-bold text-white mb-3 fade-in">Đang kiểm tra phiên...</h2>
+          <p className="text-gray-400 mb-4 fade-in">Xác thực đánh dấu trong Database</p>
+          <div className="card p-4 fade-in">
             <div className="flex items-center justify-center gap-2">
               <Shield className="w-5 h-5 text-blue-400" />
               <p className="text-blue-400 text-sm">Bảo mật: Chỉ cho phép truy cập các phiên đã được đánh dấu</p>
@@ -181,177 +179,168 @@ function LinkSkipPage() {
     );
   }
 
-  // Show error if session not found (will redirect automatically)
-  if (validationError || !sessionInfo) {
+  // Show error if validation failed
+  if (validationError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-indigo-950 flex items-center justify-center">
         <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-white mb-3">Phiên không hợp lệ</h2>
-          <p className="text-slate-400 mb-6">{validationError || 'URL không được đánh dấu trong Database'}</p>
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-              <p className="text-red-400 text-sm">Bạn sẽ được chuyển về trang chủ trong giây lát...</p>
+          <div className="card p-6 border-l-4 border-red-500 fade-in">
+            <div className="flex items-center gap-4">
+              <AlertCircle className="w-8 h-8 text-red-400 flex-shrink-0" />
+              <div className="text-left">
+                <h3 className="text-lg font-semibold text-white mb-2">Lỗi xác thực</h3>
+                <p className="text-gray-400">{validationError}</p>
+              </div>
             </div>
           </div>
           <button
             onClick={() => navigate('/')}
-            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+            className="btn btn-primary mt-6"
           >
-            Quay lại trang chủ
+            Quay về trang chủ
           </button>
         </div>
       </div>
     );
   }
 
-  // Show countdown for key generation
+  // Show countdown before key generation
   if (showCountdown) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-20 h-20 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-          <h2 className="text-3xl font-bold text-white mb-4">Đang "đúc" Key...</h2>
-          <p className="text-green-400 text-xl mb-2">{countdown}</p>
-          <p className="text-slate-400">Vui lòng chờ trong giây lát</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-indigo-950 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="card p-8 fade-in">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center text-3xl font-bold text-white mx-auto mb-6 glow">
+              {countdown}
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">Đang tạo key của bạn...</h2>
+            <p className="text-gray-400 mb-4">Key sẽ sẵn sàng trong {countdown} giây</p>
+            <div className="loading-dots justify-center">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  const progress = ((completedLinks.length) / links.length) * 100;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-indigo-950">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <ExternalLink className="w-10 h-10 text-blue-400" />
-            <h1 className="text-4xl font-bold text-white">Vượt Link</h1>
-          </div>
-          <p className="text-slate-400 text-lg">Hoàn thành các link để nhận key</p>
-        </div>
-
-        {/* Session Info */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 mb-8">
+        <header className="mb-8 fade-in">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">
-                  {serviceId === 'lootlab' ? '🎮' : 
-                   serviceId === 'worklink' ? '💼' : 
-                   serviceId === 'linkvertise' ? '🔗' : '🐼'}
-                </span>
+            <button
+              onClick={() => navigate('/')}
+              className="btn btn-ghost hover:bg-gray-800 transition-all duration-200"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </button>
+            
+            <div className="card p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-2xl shadow-lg">
+                {serviceId === 'lootlab' ? '🎮' : 
+                 serviceId === 'worklink' ? '💼' : 
+                 serviceId === 'linkvertise' ? '🔗' : '🐼'}
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">Dịch vụ: {serviceId}</h3>
-                <p className="text-slate-400 text-sm">Thời gian: {time}</p>
+                <p className="text-sm text-gray-400">Thời gian: {time}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                   <p className="text-green-400 text-xs">✓ Phiên đã được đánh dấu trong Database</p>
                 </div>
               </div>
             </div>
+          </div>
+        </header>
+
+        {/* Progress */}
+        <section className="mb-8 fade-in">
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Tiến độ vượt link</h3>
+              <span className="text-sm text-gray-400">
+                {currentLinkIndex} / {links.length} hoàn thành
+              </span>
+            </div>
             
-            <button
-              onClick={() => navigate('/')}
-              className="px-4 py-2 bg-slate-600/20 hover:bg-slate-600/30 text-slate-400 rounded-lg transition-colors text-sm flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Quay lại
-            </button>
-          </div>
-        </div>
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-700 rounded-full h-3 mb-6">
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-500"
+                style={{ width: `${(currentLinkIndex / links.length) * 100}%` }}
+              ></div>
+            </div>
 
-        {/* Progress Bar */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-semibold">Tiến độ</h3>
-            <span className="text-blue-400 font-medium">{completedLinks.length}/{links.length} link</span>
-          </div>
-          <div className="w-full bg-slate-700 rounded-full h-3">
-            <div 
-              className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-        </div>
-
-        {/* Links */}
-        <div className="space-y-4">
-          {links.map((link, index) => (
-            <div
-              key={link.id}
-              className={`p-6 rounded-xl border-2 transition-all duration-200 ${
-                completedLinks.includes(index)
-                  ? 'border-green-500 bg-green-500/10'
-                  : index === currentLinkIndex
-                  ? 'border-blue-500 bg-blue-500/10'
-                  : 'border-slate-700/50 bg-slate-800/50'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    completedLinks.includes(index)
-                      ? 'bg-green-500'
-                      : index === currentLinkIndex
-                      ? 'bg-blue-500'
-                      : 'bg-slate-600'
-                  }`}>
-                    {completedLinks.includes(index) ? (
-                      <CheckCircle className="w-6 h-6 text-white" />
+            {/* Links Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {links.map((link, index) => (
+                <div
+                  key={link.id}
+                  className={`card p-4 cursor-pointer transition-all duration-300 ${
+                    completedLinks[index] 
+                      ? 'border-green-500 bg-green-500/10' 
+                      : isProcessing
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:border-blue-500 hover:scale-105'
+                  }`}
+                  onClick={() => !completedLinks[index] && handleLinkClick(index)}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-semibold text-white">{link.title}</span>
+                    {completedLinks[index] ? (
+                      <CheckCircle className="w-5 h-5 text-green-400" />
                     ) : (
-                      <span className="text-white font-bold">{link.id}</span>
+                      <ExternalLink className="w-5 h-5 text-gray-400" />
                     )}
                   </div>
-                  <div>
-                    <h4 className="text-white font-semibold">{link.title}</h4>
-                    <p className="text-slate-400 text-sm">{link.description}</p>
-                  </div>
-                </div>
-                
-                {/* Chỉ hiện nút cho link hiện tại */}
-                {index === currentLinkIndex && !completedLinks.includes(index) && (
+                  <p className="text-sm text-gray-400 mb-3">{link.description}</p>
                   <button
-                    onClick={() => handleLinkClick(index)}
-                    className="px-6 py-3 rounded-lg transition-colors flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white"
+                    className={`btn w-full ${
+                      completedLinks[index] 
+                        ? 'btn-secondary' 
+                        : isProcessing
+                        ? 'btn-secondary opacity-50 cursor-not-allowed'
+                        : 'btn-primary'
+                    }`}
+                    disabled={completedLinks[index] || isProcessing}
                   >
-                    <ExternalLink className="w-5 h-5" />
-                    Vượt Link {index + 1}
-                  </button>
-                )}
-                
-                {/* Hiển thị trạng thái cho các link khác */}
-                {index !== currentLinkIndex && (
-                  <div className="px-6 py-3 rounded-lg flex items-center gap-2 bg-slate-600 text-slate-400">
-                    {completedLinks.includes(index) ? (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        Hoàn thành
-                      </>
+                    {completedLinks[index] ? (
+                      <span className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Đã hoàn thành
+                      </span>
+                    ) : isProcessing && currentLinkIndex === index ? (
+                      <span className="flex items-center gap-2">
+                        <div className="loading-spinner"></div>
+                        Đang xử lý...
+                      </span>
                     ) : (
-                      'Chờ'
+                      <span>Vượt link</span>
                     )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Session Validation Status */}
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 mt-8">
-          <div className="flex items-center gap-3">
-            <Shield className="w-5 h-5 text-green-400" />
-            <div>
-              <h4 className="text-green-400 font-semibold text-sm">✅ Frontend Đã Đổ Vào Khung Đánh Dấu</h4>
-              <p className="text-slate-400 text-xs">Giao diện chỉ hiển thị sau khi Database xác thực phiên</p>
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* Instructions */}
+        <section className="fade-in">
+          <div className="card p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Hướng dẫn</h3>
+            <div className="space-y-3 text-gray-400 text-sm">
+              <p>1. Nhấn nút "Vượt link" cho từng link ở trên</p>
+              <p>2. Chờ đợi xử lý xong (khoảng 2-3 giây)</p>
+              <p>3. Lặp lại cho đến khi hết link</p>
+              <p>4. Key sẽ được tạo tự động sau khi hoàn thành tất cả</p>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
