@@ -16,10 +16,11 @@ function App() {
           <Route path="/" element={<ServiceSelectionPage />} />
           
           {/* Dynamic service-time signature routes */}
-          <Route path="/:serviceId-:randomId" element={<TimeSelectionPage />} />
-          <Route path="/:serviceId-:randomId/:time" element={<LinkSkipPage />} />
+          <Route path="/:serviceId" element={<TimeSelectionPage />} />
+          <Route path="/:serviceId/get-key&:time" element={<LinkSkipPage />} />
           
-          {/* Key display page with query params */}
+          {/* Key display page with clean URL */}
+          <Route path="/:serviceId/key-:id" element={<KeyDisplayPage />} />
           <Route path="/key" element={<KeyDisplayPage />} />
 
           {/* URL "Đóng đinh" - Khi Admin gửi link này cho người khác */}

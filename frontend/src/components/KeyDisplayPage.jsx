@@ -4,7 +4,7 @@ import { Clock, Key, Copy, CheckCircle, ChevronLeft, Zap, Loader2, AlertCircle, 
 
 function KeyDisplayPage() {
   const navigate = useNavigate();
-  const { serviceId, randomId } = useParams();
+  const { serviceId, id } = useParams();
   const [keys, setKeys] = useState([]);
   const [generating, setGenerating] = useState(true);
   const [countdown, setCountdown] = useState(10);
@@ -153,7 +153,7 @@ function KeyDisplayPage() {
       }
     } catch (error) {
       const currentTime = Math.floor(Date.now() / 1000);
-      const demoKey = `KHOA-${selectedTime}-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
+      const demoKey = `KHOA-${serviceId}-${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
       setKeys([{ 
         id: 'demo-1',
         key: demoKey, 

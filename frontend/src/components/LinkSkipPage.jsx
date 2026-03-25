@@ -8,9 +8,8 @@ function LinkSkipPage() {
   const params = useParams();
   const [searchParams] = useSearchParams();
   
-  // Parse serviceId-randomId from URL
-  const urlPath = Object.values(params)[0] || '';
-  const [serviceId, randomId, timeSignature] = urlPath.split('-');
+  // Get serviceId and time from URL params
+  const { serviceId, time } = params;
   
   const [sessionInfo, setSessionInfo] = useState(null);
   const [isValidatingSession, setIsValidatingSession] = useState(true);
@@ -28,7 +27,7 @@ function LinkSkipPage() {
   // BẢO MẬT NẠP FRONTEND - Validate session marking TRƯỚC KHI render
   useEffect(() => {
     const validateSessionMarking = async () => {
-      if (!serviceId || !randomId || !timeSignature) {
+      if (!serviceId || !time) {
         console.log('[LinkSkip] ❌ Invalid URL format, redirecting to home');
         navigate('/');
         return;
@@ -39,14 +38,14 @@ function LinkSkipPage() {
         const response = await fetch(`${apiBaseUrl}/api/check-session-mark`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ randomId })
+          body: JSON.stringify({ serviceId })
         });
         
         const result = await response.json();
         
         if (result.success && result.exists) {
           // Session exists in database - CHO PHÉP frontend render
-          console.log(`[LinkSkip] ✅ Session validated: ${serviceId}-${randomId}`);
+          console.log(`[LinkSkip] ✅ Session validated: ${serviceId}`);
           setSessionInfo({
             service: result.service,
             status: result.status,
@@ -55,10 +54,10 @@ function LinkSkipPage() {
           });
           
           // Initialize links based on time signature
-          initializeLinks(timeSignature);
+          initializeLinks(time);
         } else {
           // Session NOT found in database - ĐÁ VĂNG về home
-          console.log(`[LinkSkip] ❌ Session not found in DB: ${serviceId}-${randomId}`);
+          console.log(`[LinkSkip] ❌ Session not found in DB: ${serviceId}`);
           console.log('[LinkSkip] 🚫 User tried to access unmarked URL - redirecting to home');
           setValidationError('Phiên không hợp lệ hoặc đã hết hạn');
           
@@ -79,7 +78,7 @@ function LinkSkipPage() {
     };
 
     validateSessionMarking();
-  }, [serviceId, randomId, timeSignature, navigate]);
+  }, [serviceId, time, navigate]);
 
   const initializeLinks = (timeSig) => {
     // Extract hours from time signature (e.g., "2h" -> 2)
@@ -90,7 +89,7 @@ function LinkSkipPage() {
     for (let i = 1; i <= linkCount; i++) {
       generatedLinks.push({
         id: i,
-        url: `https://example.com/link${i}?service=${serviceId}&session=${randomId}`,
+        url: `https://example.com/link${i}?service=${serviceId}&session=${serviceId}`,
         title: `Link ${i}`,
         description: `Vượt link ${i}/${linkCount}`
       });
@@ -159,8 +158,8 @@ function LinkSkipPage() {
     const randomPart = Array.from({length: 25}, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
     const forgedKey = `KHOA-${serviceId.toUpperCase()}-${randomPart}`;
     
-    // Redirect to key display page
-    navigate(`/key?${serviceId}=${forgedKey}`);
+    // Redirect to key display page with clean URL
+    navigate(`/${serviceId}/key-${forgedKey}`);
   };
 
   // Show loading while validating session
@@ -248,7 +247,7 @@ function LinkSkipPage() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">Dịch vụ: {serviceId}</h3>
-                <p className="text-slate-400 text-sm">Phiên: {randomId} • Thời gian: {timeSignature}</p>
+                <p className="text-slate-400 text-sm">Thời gian: {time}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                   <p className="text-green-400 text-xs">✓ Phiên đã được đánh dấu trong Database</p>

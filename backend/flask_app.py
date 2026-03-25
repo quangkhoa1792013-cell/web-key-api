@@ -49,12 +49,12 @@ def log_info(message):
     message_lower = message.lower()
     
     if any(keyword.lower() in message_lower for keyword in traceback_keywords):
-        # Always use ERROR cho Traceback/Exception
-        logging.error(f"[{timestamp}] ERROR: {message}")
+        # Always use info cho Traceback/Exception
+        logging.info(f"[{timestamp}] INFO: {message}")
     elif any(keyword.lower() in message_lower for keyword in success_keywords):
         logging.info(f"[{timestamp}] INFO: {message}")
     elif any(keyword.lower() in message_lower for keyword in error_keywords):
-        logging.error(f"[{timestamp}] ERROR: {message}")
+        logging.info(f"[{timestamp}] INFO: {message}")
     else:
         # Default to info cho general messages
         logging.info(f"[{timestamp}] INFO: {message}")
@@ -333,7 +333,7 @@ class NeonKeySystem:
                 log_info("✅ Database indexes created successfully")
                 
         except Exception as e:
-            log_msg(f"❌ Failed to create indexes: {e}")
+            log_info(f"❌ Failed to create indexes: {e}")
             # Don't return False here, as indexes might already exist
     
     def execute_query(self, query, params=None, max_retries=3):

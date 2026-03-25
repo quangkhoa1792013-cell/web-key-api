@@ -6,9 +6,8 @@ function TimeSelectionPage() {
   const navigate = useNavigate();
   const params = useParams();
   
-  // Parse serviceId-randomId from URL
-  const urlPath = Object.values(params)[0] || '';
-  const [serviceId, randomId] = urlPath.split('-');
+  // Get serviceId from URL params
+  const { serviceId } = params;
   
   const [selectedTime, setSelectedTime] = useState(null);
   const [sessionInfo, setSessionInfo] = useState(null);
@@ -18,8 +17,8 @@ function TimeSelectionPage() {
   // Validate session marking TRƯỚC KHI render
   useEffect(() => {
     const validateSessionMarking = async () => {
-      if (!serviceId || !randomId) {
-        console.log('[TimeSelection] ❌ Invalid URL format, redirecting to home');
+      if (!serviceId) {
+        console.log('[TimeSelection] ❌ Invalid service ID, redirecting to home');
         navigate('/');
         return;
       }
@@ -29,14 +28,14 @@ function TimeSelectionPage() {
         const response = await fetch(`${apiBaseUrl}/api/check-session-mark`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ randomId })
+          body: JSON.stringify({ serviceId })
         });
         
         const result = await response.json();
         
         if (result.success && result.exists) {
           // Session exists in database - CHO PHÉP frontend render
-          console.log(`[TimeSelection] ✅ Session validated: ${serviceId}-${randomId}`);
+          console.log(`[TimeSelection] ✅ Session validated: ${serviceId}`);
           setSessionInfo({
             service: result.service,
             status: result.status,
@@ -45,7 +44,7 @@ function TimeSelectionPage() {
           });
         } else {
           // Session NOT found in database - ĐÁ VỀNG về home (Bảo mật Nạp Frontend)
-          console.log(`[TimeSelection] ❌ Session not found in DB: ${serviceId}-${randomId}`);
+          console.log(`[TimeSelection] ❌ Session not found in DB: ${serviceId}`);
           console.log('[TimeSelection] 🚫 Bảo mật: User tried to access unmarked URL - redirecting to home');
           setValidationError('Phiên không hợp lệ hoặc đã hết hạn');
           
@@ -85,8 +84,8 @@ function TimeSelectionPage() {
     // Update session with time signature
     updateSessionWithTime(hours, links);
     
-    // Navigate to link skip page with time signature
-    navigate(`/${serviceId}-${randomId}/${hours}h`);
+    // Navigate to link skip page with clean URL
+    navigate(`/${serviceId}/get-key&${hours}h`);
   };
 
   const updateSessionWithTime = async (hours, links) => {
@@ -97,7 +96,6 @@ function TimeSelectionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           serviceId, 
-          randomId, 
           durationHours: hours,
           requiredLinks: links
         })
@@ -244,7 +242,7 @@ function TimeSelectionPage() {
                   </span>
                 </div>
                 <p className="text-blue-400 text-sm mt-2">
-                  URL cố định: /{serviceId}-{randomId}/{selectedTime}h
+                  URL cố định: /{serviceId}/get-key&{selectedTime}h
                 </p>
               </div>
               <div className="text-right">

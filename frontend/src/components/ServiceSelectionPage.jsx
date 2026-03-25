@@ -62,9 +62,6 @@ function ServiceSelectionPage() {
     setMarkingError(null);
     
     try {
-      // Generate random ID for session
-      const randomId = Math.random().toString(36).substring(2, 10).toLowerCase();
-      
       // Call backend to mark session
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://khoablabla-backend.hf.space';
       const response = await fetch(`${apiBaseUrl}/api/mark-session`, {
@@ -72,7 +69,6 @@ function ServiceSelectionPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           serviceId: selectedService,
-          randomId: randomId,
           ipAddress: null, // Backend will auto-detect
           userAgent: navigator.userAgent
         })
@@ -83,11 +79,10 @@ function ServiceSelectionPage() {
       if (result.success) {
         // Save to localStorage
         localStorage.setItem('selectedService', selectedService);
-        localStorage.setItem('randomId', randomId);
         localStorage.setItem('sessionId', result.sessionId);
         
-        // Navigate to time selection page
-        navigate(`/${selectedService}-${randomId}`);
+        // Navigate to time selection page with clean URL
+        navigate(`/${selectedService}`);
       } else {
         setMarkingError(result.message);
       }
