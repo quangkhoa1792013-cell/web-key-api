@@ -9,7 +9,7 @@ const services = [
   { id: 'pandas', name: 'Pandas', icon: '🐼', color: 'from-orange-500 to-red-500' },
 ];
 
-function ServiceSelectionPage() {
+function ServiceSelectionPage({ setUserSession }) {
   const navigate = useNavigate();
   const [selectedService, setSelectedService] = useState(null);
   const [generatedLink, setGeneratedLink] = useState('');
@@ -53,6 +53,10 @@ function ServiceSelectionPage() {
   const handleServiceSelect = (serviceId) => {
     setSelectedService(serviceId);
     setMarkingError(null);
+    // Clear any existing session when selecting new service
+    if (typeof setUserSession === 'function') {
+      setUserSession(null);
+    }
   };
 
   const handleStartProcess = async () => {
@@ -127,7 +131,7 @@ function ServiceSelectionPage() {
         </div>
 
         {/* Service Options with Key Status */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8 mb-8 max-w-4xl mx-auto">
           {services.map((service) => {
             const keyInfo = serviceKeys[service.id] || {};
             const hasKey = keyInfo.hasKey || false;
@@ -139,13 +143,13 @@ function ServiceSelectionPage() {
                 key={service.id}
                 onClick={() => handleServiceSelect(service.id)}
                 disabled={markingSession}
-                className={`p-8 rounded-xl border-2 transition-all duration-200 transform hover:scale-[1.02] ${
+                className={`p-8 rounded-xl border-2 transition-all duration-200 transform hover:scale-[1.02] min-h-[280px] w-full flex flex-col justify-center ${
                   selectedService === service.id
                     ? 'border-blue-500 bg-gradient-to-br from-blue-500/10 to-blue-600/10 shadow-lg shadow-blue-500/20'
                     : 'border-slate-700/50 bg-slate-800/50 hover:border-slate-600/50'
                 } ${markingSession ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <div className="flex flex-col items-center space-y-4">
+                <div className="flex flex-col items-center space-y-4 flex-1 justify-between">
                   <div className={`w-20 h-20 rounded-full bg-gradient-to-br ${service.color} flex items-center justify-center text-3xl shadow-lg`}>
                     {service.icon}
                   </div>
@@ -229,8 +233,8 @@ function ServiceSelectionPage() {
         )}
 
         {/* Instructions */}
-        <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-6">
-          <h3 className="text-white font-semibold mb-4">Luồng hoạt động</h3>
+        <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-6 max-w-2xl mx-auto">
+          <h3 className="text-white font-semibold mb-4 text-center">Luồng hoạt động</h3>
           <ol className="space-y-2 text-slate-400 text-sm list-decimal list-inside">
             <li>Chọn dịch vụ → Xem trạng thái Key</li>
             <li>Nhấn "Bắt đầu" → Đánh dấu phiên</li>

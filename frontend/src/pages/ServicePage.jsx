@@ -73,7 +73,9 @@ const ServicePage = ({ setUserSession }) => {
 
   useEffect(() => {
     // Clear any existing session when entering service page
-    setUserSession(null);
+    if (typeof setUserSession === 'function') {
+      setUserSession(null);
+    }
   }, [serviceId, setUserSession]);
 
   return (

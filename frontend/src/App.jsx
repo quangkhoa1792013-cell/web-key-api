@@ -1,6 +1,7 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useState } from 'react';
 import ServiceSelectionPage from './components/ServiceSelectionPage';
-import TimeSelectionPage from './components/TimeSelectionPage';
+import ServicePage from './pages/ServicePage';
 import LinkSkipPage from './components/LinkSkipPage';
 import KeyDisplayPage from './components/KeyDisplayPage';
 import KeyDashboard from './components/KeyDashboard';
@@ -8,15 +9,17 @@ import ExpiredPage from './components/ExpiredPage';
 import AntiCheatProvider from './components/AntiCheatProvider';
 
 function App() {
+  const [userSession, setUserSession] = useState(null);
+  
   return (
     <Router>
       <AntiCheatProvider>
         <Routes>
           {/* Main page - Service selection */}
-          <Route path="/" element={<ServiceSelectionPage />} />
+          <Route path="/" element={<ServiceSelectionPage setUserSession={setUserSession} />} />
           
-          {/* Dynamic service-time signature routes */}
-          <Route path="/:serviceId" element={<TimeSelectionPage />} />
+          {/* Service pages */}
+          <Route path="/:serviceId" element={<ServicePage setUserSession={setUserSession} />} />
           <Route path="/:serviceId/get-key&:time" element={<LinkSkipPage />} />
           
           {/* Key display page with clean URL */}
@@ -29,6 +32,9 @@ function App() {
           {/* Dashboard and expired page */}
           <Route path="/dashboard" element={<KeyDashboard />} />
           <Route path="/expired" element={<ExpiredPage />} />
+          
+          {/* 404 redirect to home */}
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </AntiCheatProvider>
     </Router>
