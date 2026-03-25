@@ -20,11 +20,11 @@ function App() {
           
           {/* Service pages */}
           <Route path="/:serviceId" element={<ServicePage setUserSession={setUserSession} />} />
-          <Route path="/:serviceId/get-key&:time" element={<LinkSkipPage />} />
+          <Route path="/:serviceId/get-key&:time" element={<LinkSkipPage setUserSession={setUserSession} />} />
           
           {/* Key display page with clean URL */}
-          <Route path="/:serviceId/key-:id" element={<KeyDisplayPage />} />
-          <Route path="/key" element={<KeyDisplayPage />} />
+          <Route path="/:serviceId/key-:id" element={<KeyDisplayPage setUserSession={setUserSession} />} />
+          <Route path="/key" element={<KeyDisplayPage setUserSession={setUserSession} />} />
 
           {/* URL "Đóng đinh" - Khi Admin gửi link này cho người khác */}
           <Route path="/s/:id" element={<KeyDisplayPage />} />

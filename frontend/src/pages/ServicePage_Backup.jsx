@@ -15,14 +15,14 @@ const ServicePage = ({ setUserSession }) => {
       name: 'LootLab',
       description: 'Generate premium LootLab keys for enhanced gaming experience',
       features: ['Unlimited Access', 'Premium Features', 'Priority Support'],
-      color: 'var(--primary)',
+      color: 'var(--primary-600)',
       icon: '🎮'
     },
     worklink: {
       name: 'WorkLink',
       description: 'Access exclusive WorkLink content and tools',
       features: ['Premium Content', 'Ad-Free Experience', 'Advanced Tools'],
-      color: 'var(--secondary)',
+      color: 'var(--secondary-600)',
       icon: '💼'
     },
     pandas: {
@@ -50,7 +50,7 @@ const ServicePage = ({ setUserSession }) => {
       description: 'Perfect for testing our service',
       features: ['Basic Access', 'Limited Features', 'No Credit Card Required'],
       popular: false,
-      color: 'var(--text-muted)'
+      color: 'var(--gray-600)'
     },
     {
       id: '24h',
@@ -60,7 +60,7 @@ const ServicePage = ({ setUserSession }) => {
       description: 'Most popular choice for daily use',
       features: ['Full Access', 'All Features', 'Priority Support', '24 Hour Validity'],
       popular: true,
-      color: 'var(--primary)'
+      color: 'var(--primary-600)'
     },
     {
       id: '7d',
@@ -70,7 +70,7 @@ const ServicePage = ({ setUserSession }) => {
       description: 'Best value for extended usage',
       features: ['Unlimited Access', 'Premium Features', 'VIP Support', '7 Day Validity', 'Multiple Keys'],
       popular: false,
-      color: 'var(--secondary)'
+      color: 'var(--secondary-600)'
     }
   ];
 
@@ -107,7 +107,6 @@ const ServicePage = ({ setUserSession }) => {
   };
 
   const handlePlanSelect = (planId) => {
-    // CHỈ CẬP NHẬT STATE - KHÔNG NAVIGATE
     if (!isProcessing) {
       setSelectedDuration(planId);
     }
@@ -121,28 +120,28 @@ const ServicePage = ({ setUserSession }) => {
   }, [serviceId, setUserSession]);
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-indigo-950">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <header className="mb-12 fade-in">
           <div className="flex items-center justify-between">
             <Link 
               to="/" 
-              className="btn btn-ghost transition-all duration-200"
+              className="btn btn-ghost hover:bg-gray-800 transition-all duration-200"
             >
               ← Back to Home
             </Link>
             
-            <div className="glass-card p-4 flex items-center gap-4">
+            <div className="card p-4 flex items-center gap-4">
               <div 
                 className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                style={{ backgroundColor: `${currentService.color}20`, color: currentService.color }}
+                style={{ backgroundColor: currentService.color + '20', color: currentService.color }}
               >
                 {currentService.icon}
               </div>
               <div>
-                <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{currentService.name}</h1>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{currentService.description}</p>
+                <h1 className="text-xl font-bold text-white mb-1">{currentService.name}</h1>
+                <p className="text-sm text-gray-400">{currentService.description}</p>
               </div>
             </div>
           </div>
@@ -151,23 +150,22 @@ const ServicePage = ({ setUserSession }) => {
         {/* Pricing Section */}
         <section className="mb-12 fade-in">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Choose Your Plan</h2>
-            <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>Select perfect duration for your needs</p>
+            <h2 className="text-3xl font-bold text-white mb-3">Choose Your Plan</h2>
+            <p className="text-gray-400 text-lg">Select the perfect duration for your needs</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {pricingPlans.map((plan, index) => (
               <div
                 key={plan.id}
-                className={`glass-card relative cursor-pointer transition-all duration-300 ${
+                className={`card relative cursor-pointer transition-all duration-300 hover:scale-105 ${
                   selectedDuration === plan.id 
-                    ? 'ring-2 ring-offset-2' 
-                    : ''
+                    ? 'ring-2 ring-offset-2 ring-offset-gray-900' 
+                    : 'hover:border-gray-600'
                 }`}
                 style={{
                   ringColor: selectedDuration === plan.id ? plan.color : undefined,
-                  ringOffsetColor: 'var(--bg-primary)',
-                  transform: selectedDuration === plan.id ? 'scale(1.02)' : undefined
+                  transform: selectedDuration === plan.id ? 'scale(1.05)' : undefined
                 }}
                 onClick={() => handlePlanSelect(plan.id)}
               >
@@ -181,17 +179,17 @@ const ServicePage = ({ setUserSession }) => {
                 )}
                 
                 <div className="text-center p-6">
-                  <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>{plan.name}</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
                   <div className="mb-4">
-                    <span className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{plan.price}</span>
+                    <span className="text-3xl font-bold text-white">{plan.price}</span>
                     {plan.price !== 'Free' && (
-                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>/7 days</span>
+                      <span className="text-gray-400 text-sm">/7 days</span>
                     )}
                   </div>
                   <div className="text-2xl font-semibold mb-4" style={{ color: plan.color }}>
                     {plan.duration}
                   </div>
-                  <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>{plan.description}</p>
+                  <p className="text-gray-400 text-sm mb-6">{plan.description}</p>
                   
                   <ul className="space-y-3 text-left">
                     {plan.features.map((feature, idx) => (
@@ -199,7 +197,7 @@ const ServicePage = ({ setUserSession }) => {
                         <svg className="w-5 h-5" style={{ color: plan.color }} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{feature}</span>
+                        <span className="text-sm text-gray-300">{feature}</span>
                       </li>
                     ))}
                   </ul>
@@ -211,19 +209,18 @@ const ServicePage = ({ setUserSession }) => {
 
         {/* Features Section */}
         <section className="mb-12 fade-in">
-          <div className="glass-card p-8">
-            <h3 className="text-2xl font-bold mb-6 text-center" style={{ color: 'var(--text-primary)' }}>✨ Premium Features</h3>
+          <div className="card p-8">
+            <h3 className="text-2xl font-bold text-white mb-6 text-center">✨ Premium Features</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {currentService.features.map((feature, index) => (
-                <div key={index} className="flex items-center gap-3 p-4 rounded-lg" 
-                     style={{ background: `${currentService.color}10` }}>
+                <div key={index} className="flex items-center gap-3 p-4 rounded-lg bg-gray-800/50">
                   <div 
                     className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold"
-                    style={{ backgroundColor: `${currentService.color}20`, color: currentService.color }}
+                    style={{ backgroundColor: currentService.color + '20', color: currentService.color }}
                   >
                     ✓
                   </div>
-                  <span style={{ color: 'var(--text-secondary)' }}>{feature}</span>
+                  <span className="text-gray-300">{feature}</span>
                 </div>
               ))}
             </div>
@@ -232,10 +229,10 @@ const ServicePage = ({ setUserSession }) => {
 
         {/* Action Section */}
         <section className="mb-12 fade-in">
-          <div className="glass-card p-8 text-center">
-            <h3 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>🚀 Start Key Generation</h3>
-            <p className="mb-8 max-w-2xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
-              Click button below to start verification process. You'll be guided through a series of steps to generate your unique premium key.
+          <div className="card p-8 text-center">
+            <h3 className="text-2xl font-bold text-white mb-4">🚀 Start Key Generation</h3>
+            <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
+              Click the button below to start the verification process. You'll be guided through a series of steps to generate your unique premium key.
             </p>
             
             <button
@@ -244,7 +241,7 @@ const ServicePage = ({ setUserSession }) => {
               }`}
               style={{
                 background: selectedDuration 
-                  ? currentService.color
+                  ? `linear-gradient(135deg, ${currentService.color}, ${currentService.color}dd)`
                   : undefined
               }}
               onClick={handleStartProcess}
@@ -269,17 +266,17 @@ const ServicePage = ({ setUserSession }) => {
 
         {/* Security Notice */}
         <section className="fade-in">
-          <div className="glass-card p-6 border-l-4" style={{ borderLeftColor: 'var(--warning)' }}>
+          <div className="card p-6 border-l-4" style={{ borderLeftColor: 'var(--warning)' }}>
             <div className="flex items-start gap-4">
               <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" 
-                   style={{ backgroundColor: 'var(--warning)', color: 'var(--bg-primary)' }}>
+                   style={{ backgroundColor: 'var(--warning)', color: 'var(--gray-900)' }}>
                 🔒
               </div>
               <div>
-                <h4 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Security Notice</h4>
-                <p className="leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                <h4 className="text-lg font-semibold text-white mb-2">Security Notice</h4>
+                <p className="text-gray-400 leading-relaxed">
                   This process includes security measures to prevent unauthorized access and link sharing. 
-                  Each user must complete verification process individually. Your keys are unique 
+                  Each user must complete the verification process individually. Your keys are unique 
                   and tied to your session.
                 </p>
               </div>
