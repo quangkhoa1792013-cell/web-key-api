@@ -1,4 +1,4 @@
-Get-Content frontend\src\components\ServiceSelectionPage.jsx, frontend\src\pages\ServicePage.jsx, frontend\src\components\LinkSkipPage.jsx, frontend\src\components\KeyDisplayPage.jsx, frontend\src\components\KeyDashboard.jsx, frontend\src\components\ExpiredPage.jsx, frontend\src\components\AntiCheatProvider.jsx | Set-Content Components.txt
-Get-Content frontend\src\pages\Home.jsx, frontend\src\pages\ServicePage.jsx, frontend\src\pages\KeyResult.jsx, frontend\src\pages\LinkProcess.jsx > Pages.txt
-Get-Content frontend\src\pages\ServicePage.css, frontend\src\pages\Home.css, frontend\src\pages\KeyResult.css, frontend\src\pages\LinkProcess.css > CSS_Styles.txt
-Get-Content frontend\src\App.css, frontend\src\index.css > css_global.txt
+Get-Content frontend\src\components\ServiceSelectionPage.jsx, frontend\src\pages\ServicePage.jsx, frontend\src\components\LinkSkipPage.jsx, frontend\src\components\KeyDisplayPage.jsx, frontend\src\components\KeyDashboard.jsx, frontend\src\components\ExpiredPage.jsx, frontend\src\components\AntiCheatProvider.jsx > doc\Components.txt
+Get-Content frontend\src\pages\Home.jsx, frontend\src\pages\ServicePage.jsx, frontend\src\pages\KeyResult.jsx, frontend\src\pages\LinkProcess.jsx > doc\Pages.txt
+Get-Content frontend\src\pages\ServicePage.css, frontend\src\pages\Home.css, frontend\src\pages\KeyResult.css, frontend\src\pages\LinkProcess.css > doc\CSS_Styles.txt
+Get-Content frontend\src\App.css, frontend\src\index.css > doc\css_global.txt
