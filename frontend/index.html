@@ -1,13 +1,81 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="description" content="Roblox Key System - Hệ thống quản lý key bảo mật cao" />
+    <meta name="keywords" content="roblox, key system, security, authentication" />
+    <meta name="author" content="Roblox Key System" />
+    
+    <!-- Security headers -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
+    
+    <!-- Prevent caching for security -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
+    <title>Roblox Key System - Hệ thống Quản lý Key</title>
+    
+    <!-- Preconnect to API -->
+    <link rel="preconnect" href="https://api.example.com" />
+    
+    <!-- Google Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Anti-debug script -->
+    <script>
+      // Basic anti-debug measures
+      (function() {
+        // Disable right click
+        document.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          return false;
+        });
+        
+        // Disable F12 and other dev tools shortcuts
+        document.addEventListener('keydown', function(e) {
+          if (e.keyCode === 123 || // F12
+              (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) || // Ctrl+Shift+I/J
+              (e.ctrlKey && e.keyCode === 85)) { // Ctrl+U
+            e.preventDefault();
+            return false;
+          }
+        });
+        
+        // Detect dev tools
+        var devtools = {
+          open: false,
+          orientation: null
+        };
+        
+        var threshold = 160;
+        
+        setInterval(function() {
+          if (window.outerHeight - window.innerHeight > threshold || 
+              window.outerWidth - window.innerWidth > threshold) {
+            if (!devtools.open) {
+              devtools.open = true;
+              console.clear();
+              console.log('%c⚠️ Warning!', 'color: red; font-size: 30px; font-weight: bold;');
+              console.log('%cDeveloper tools detected! Access will be blocked.', 'color: red; font-size: 16px;');
+              // In production, this would redirect or block access
+              // window.location.href = '/blocked';
+            }
+          } else {
+            devtools.open = false;
+          }
+        }, 500);
+      })();
+    </script>
   </body>
 </html>

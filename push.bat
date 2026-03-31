@@ -33,7 +33,7 @@ if not defined HAS_CHANGE_GH (
 )
 
 echo %C%--- CAC FILE BI TRUY QUET: ---%W%
-git diff --stat --cached --ignore-submodules
+git --no-pager diff --stat --cached --ignore-submodules
 echo.
 echo %Y%[*] Tien hanh dong bo nhanh MAIN len GitHub...%W%
 git branch -M main
