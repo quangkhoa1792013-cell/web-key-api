@@ -1,3 +1,10 @@
+/**
+ * @file: Processing.jsx
+ * @path: roblox/frontend/src/pages/Processing.jsx
+ * @purpose: Trang xử lý key với multi-stage workflow
+ * @functionality: Processing stages, progress tracking, real-time logs, timer
+ * @connections: Kết nối đến useAuth, useKeySystem hooks và Timer component
+ */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -53,7 +60,7 @@ const Processing = () => {
     setLogs(prev => [...prev, { message, type, timestamp }]);
   };
 
-  // Xử lý từng stage
+  // Xử lý từng stage với polling real-time
   const processStage = async (stageIndex) => {
     if (stageIndex >= stages.length) {
       setProcessingStage('completed');
@@ -65,14 +72,57 @@ const Processing = () => {
     setProcessingStage(stage.id);
     addLog(`Bắt đầu ${stage.name.toLowerCase()}...`, 'info');
 
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, stage.duration));
+    try {
+      // Polling trạng thái thực tế từ server
+      let attempts = 0;
+      const maxAttempts = 20; // 20 attempts * 500ms = 10s max
+      
+      while (attempts < maxAttempts) {
+        // Gọi API kiểm tra trạng thái
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/check-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Session-ID': sessionId,
+            'X-HWID': localStorage.getItem('hwid')
+          },
+          body: JSON.stringify({
+            stage: stage.id,
+            sessionId: sessionId
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'completed') {
+            addLog(`${stage.name} hoàn tất`, 'success');
+            break;
+          } else if (data.status === 'failed') {
+            addLog(`${stage.name} thất bại: ${data.message}`, 'error');
+            setProcessingStage('error');
+            return;
+          }
+        }
+        
+        // Delay giữa các lần polling
+        await new Promise(resolve => setTimeout(resolve, 500));
+        attempts++;
+      }
+      
+      // Nếu không nhận được response, tiếp tục stage tiếp theo
+      if (attempts >= maxAttempts) {
+        addLog(`${stage.name} timeout, tiếp tục...`, 'warning');
+      }
+    } catch (error) {
+      addLog(`Lỗi khi ${stage.name.toLowerCase()}: ${error.message}`, 'error');
+    }
+    
+    // Thêm delay nhỏ để animation mượt
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     // Update progress
     const newProgress = ((stageIndex + 1) / stages.length) * 100;
     setProgress(newProgress);
-    
-    addLog(`${stage.name} hoàn tất`, 'success');
     
     // Move to next stage
     await processStage(stageIndex + 1);

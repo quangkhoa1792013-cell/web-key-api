@@ -1,3 +1,10 @@
+/**
+ * @file: Button.jsx
+ * @path: roblox/frontend/src/components/ui/Button.jsx
+ * @purpose: Reusable Button component với multiple variants và animations
+ * @functionality: Glassmorphism effects, loading states, hover animations, icon support
+ * @connections: Được sử dụng bởi hầu hết các components và pages trong project
+ */
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';

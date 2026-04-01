@@ -1,3 +1,10 @@
+/**
+ * @file: key-system.js
+ * @path: roblox/frontend/js/key-system.js
+ * @purpose: Legacy JavaScript class cho key system (đã thay thế bởi React version)
+ * @functionality: API connection, configuration management, link completion tracking
+ * @connections: Kết nối đến backend API tại 127.0.0.1:5000, legacy file
+ */
 // Frontend JavaScript - Kết nối với Backend API
 
 class KeySystem {

@@ -1,3 +1,10 @@
+/**
+ * @file: Result.jsx
+ * @path: roblox/frontend/src/pages/Result.jsx
+ * @purpose: Trang kết quả với key information và statistics
+ * @functionality: Key display, statistics, download/share features, system info
+ * @connections: Kết nối đến useAuth, useKeySystem hooks và KeyDisplay component
+ */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -40,43 +47,18 @@ const Result = () => {
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  // Mock result data (trong thực tế sẽ lấy từ API)
-  const mockResultData = {
-    success: true,
-    key: keyData?.key || 'DEMO-KEY-1234-ABCD-EFGH',
-    status: 'active',
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 ngày
-    usage: {
-      total: 1,
-      remaining: 999,
-      lastUsed: new Date().toISOString()
-    },
-    features: [
-      'Full Access',
-      'Priority Support',
-      'No Ads',
-      'Advanced Features'
-    ],
-    statistics: {
-      processingTime: '2.3s',
-      verificationScore: 98,
-      securityLevel: 'Maximum'
-    }
-  };
-
   // Load result data
   const loadResultData = async () => {
     setIsLoading(true);
     try {
-      // Trong thực tế, gọi API để lấy kết quả
-      // const result = await api.getResult(sessionId);
+      // Gọi API để lấy thông tin key thật
+      const result = await getKeyInfo({ sessionId });
       
-      // Mock data
-      setTimeout(() => {
-        setResultData(mockResultData);
-        setIsLoading(false);
-      }, 1000);
+      // Thêm delay nhỏ để animation mượt mà
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setResultData(result);
+      setIsLoading(false);
     } catch (error) {
       console.error('Failed to load result:', error);
       setIsLoading(false);

@@ -1,3 +1,10 @@
+/**
+ * @file: AntiCheatBadge.jsx
+ * @path: roblox/frontend/src/components/features/AntiCheatBadge.jsx
+ * @purpose: Security status badge component với real-time updates
+ * @functionality: Status indicators, animated icons, detailed information panel
+ * @connections: Được sử dụng trong header các pages, kết nối đến anti-cheat system
+ */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, Eye } from 'lucide-react';

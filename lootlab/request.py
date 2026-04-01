@@ -1,3 +1,10 @@
+"""
+ * @file: request.py
+ * @path: roblox/lootlab/request.py
+ * @purpose: LootLabs API request script cho content locker
+ * @functionality: Send requests to LootLabs API, read API token from file
+ * @connections: Kết nối đến creators.lootlabs.gg API endpoint
+"""
 import requests
 
 with open('api.txt', 'r', encoding='utf-8') as file:

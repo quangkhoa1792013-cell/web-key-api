@@ -1,3 +1,10 @@
+/**
+ * @file: vite.config.js
+ * @path: roblox/frontend/vite.config.js
+ * @purpose: Cấu hình Vite build tool cho frontend React application
+ * @functionality: Plugin React, API debug logger, middleware cho HWID và IP tracking
+ * @connections: Kết nối đến development server, log API requests với HWID headers
+ */
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -26,7 +33,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:7860',
+        target: process.env.VITE_API_PROXY_TARGET,
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path,

@@ -1,3 +1,10 @@
+/**
+ * @file: useKeySystem.js
+ * @path: roblox/frontend/src/hooks/useKeySystem.js
+ * @purpose: Hook quản lý hệ thống key operations
+ * @functionality: Key request, verification, info retrieval, revocation với error handling
+ * @connections: Kết nối đến AuthContext và keyApi, gọi API endpoints
+ */
 import { useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { keyApi } from '../api/keyApi';

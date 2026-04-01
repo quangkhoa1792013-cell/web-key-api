@@ -1,3 +1,10 @@
+/**
+ * @file: BlockedPage.jsx
+ * @path: roblox/frontend/src/pages/BlockedPage.jsx
+ * @purpose: Trang blocked cho security violations
+ * @functionality: Access blocked message, retry options, security warnings
+ * @connections: Được sử dụng khi user bị block bởi anti-cheat system
+ */
 import React from 'react';
 import { motion } from 'framer-motion';
 import { ShieldX, AlertTriangle, Lock, RefreshCw } from 'lucide-react';

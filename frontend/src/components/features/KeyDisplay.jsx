@@ -1,3 +1,10 @@
+/**
+ * @file: KeyDisplay.jsx
+ * @path: roblox/frontend/src/components/features/KeyDisplay.jsx
+ * @purpose: Key display component với security features
+ * @functionality: Masked/unmasked view, copy to clipboard, download, key information
+ * @connections: Được sử dụng trong Home và Result pages, kết nối đến keyData state
+ */
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, Eye, EyeOff, Key, Shield, Clock } from 'lucide-react';

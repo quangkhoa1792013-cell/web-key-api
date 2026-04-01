@@ -1,3 +1,10 @@
+/**
+ * @file: tailwind.config.js
+ * @path: roblox/frontend/tailwind.config.js
+ * @purpose: Cấu hình Tailwind CSS cho frontend application
+ * @functionality: Định nghĩa content paths, custom colors (primary palette), theme extensions
+ * @connections: Được sử dụng bởi src/styles/index.css và tất cả các React components
+ */
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [

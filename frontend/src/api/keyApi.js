@@ -1,3 +1,10 @@
+/**
+ * @file: keyApi.js
+ * @path: roblox/frontend/src/api/keyApi.js
+ * @purpose: API layer cho key và authentication operations
+ * @functionality: Axios configuration, HWID headers, request/response interceptors, API endpoints
+ * @connections: Kết nối đến backend API endpoints, tự động thêm X-HWID và X-Session-ID headers
+ */
 import axios from 'axios';
 
 // Cấu hình axios instance

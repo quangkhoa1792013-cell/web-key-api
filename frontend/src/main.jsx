@@ -1,3 +1,10 @@
+/**
+ * @file: main.jsx
+ * @path: roblox/frontend/src/main.jsx
+ * @purpose: Entry point chính cho React application
+ * @functionality: Render App component, import styles, production console cleanup, Service Worker
+ * @connections: Mount App.jsx vào #root DOM element, load styles/index.css và index.css
+ */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';

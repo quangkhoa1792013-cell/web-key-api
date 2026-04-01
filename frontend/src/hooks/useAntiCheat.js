@@ -1,3 +1,10 @@
+/**
+ * @file: useAntiCheat.js
+ * @path: roblox/frontend/src/hooks/useAntiCheat.js
+ * @purpose: Hook bảo mật chống bypass và cheating
+ * @functionality: HWID fingerprinting, time drift detection, DevTools protection, key blocking
+ * @connections: Kết nối đến AuthContext, localStorage, DOM events listeners
+ */
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 

@@ -1,3 +1,10 @@
+/**
+ * @file: App.jsx
+ * @path: roblox/frontend/src/App.jsx
+ * @purpose: Component chính của ứng dụng với routing và authentication
+ * @functionality: React Router setup, route guards, page transitions, background effects
+ * @connections: Kết nối đến tất cả pages, AuthContext, useAntiCheat hook
+ */
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -56,6 +63,7 @@ const PublicRoute = ({ children }) => {
 // Main App Component
 const App = () => {
   const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated, sessionId } = useAuth();
 
   // Initialize app
   useEffect(() => {
@@ -64,8 +72,15 @@ const App = () => {
         // Khởi tạo anti-cheat
         // Các khởi tạo khác có thể thêm ở đây
         
-        // Simulate loading time
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Kiểm tra session thật từ AuthContext
+        if (isAuthenticated && sessionId) {
+          console.log('Session hợp lệ, khởi tạo hoàn tất');
+        } else {
+          console.log('Không có session, cần đăng nhập');
+        }
+        
+        // Thêm delay nhỏ để animation mượt mà
+        await new Promise(resolve => setTimeout(resolve, 300));
       } catch (error) {
         console.error('App initialization failed:', error);
       } finally {
@@ -74,7 +89,7 @@ const App = () => {
     };
 
     initializeApp();
-  }, []);
+  }, [isAuthenticated, sessionId]);
 
   // Hiển thị loading screen khi khởi tạo
   if (isLoading) {

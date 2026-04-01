@@ -1,3 +1,10 @@
+--[[
+ * @file: roblox_script.lua
+ * @path: roblox/roblox_script.lua
+ * @purpose: Script chính cho Roblox với hệ thống heartbeat và validation
+ * @functionality: Validate keys mỗi 60 giây, tự hủy khi hết hạn, quản lý retry logic
+ * @connections: Kết nối đến API endpoint tại khoablabla.pythonanywhere.com/api
+--]]
 -- Roblox Script with Heartbeat System
 -- This script validates keys every 60 seconds and self-destructs when expired
 

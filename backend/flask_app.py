@@ -1,3 +1,10 @@
+"""
+ * @file: flask_app.py
+ * @path: roblox/backend/flask_app.py
+ * @purpose: Flask application chính cho Roblox Key System backend
+ * @functionality: API endpoints, database operations, key generation, validation, logging
+ * @connections: Kết nối đến PostgreSQL database, Neon service, Telegram logging
+"""
 import psycopg2
 import os
 import json
@@ -31,10 +38,23 @@ CORS(app,
          'http://localhost:3000',
          'https://khoablabla2013.pythonanywhere.com',
          'https://khoablabla2013.netlify.app',
-         r'^https://[a-zA-Z0-9-]+\.netlify\.app$'  # Regex cho tất cả netlify subdomains
+         'https://khoablabla-backend.hf.space',  # Hugging Face Space
+         r'^https://[a-zA-Z0-9-]+\.netlify\.app$',  # Regex cho tất cả netlify subdomains
+         r'^https://[a-zA-Z0-9-]+\.hf\.space$',    # Regex cho tất cả Hugging Face Spaces
+         r'^https://[a-zA-Z0-9-]+\.pages\.dev$',    # Regex cho Cloudflare Pages
+         '*'  # Tạm thời cho phép tất cả origins trong development
      ],
-     methods=['GET', 'POST', 'OPTIONS'],
-     allow_headers=['Content-Type', 'Authorization', 'x-user-agent', 'x-timestamp'],
+     methods=['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+     allow_headers=[
+         'Content-Type', 
+         'Authorization', 
+         'x-user-agent', 
+         'x-timestamp',
+         'X-HWID',
+         'X-Session-ID',
+         'X-Forwarded-For',
+         'CF-Connecting-IP'  # Cloudflare headers
+     ],
      supports_credentials=True)
 
 def log_info(message):
@@ -931,6 +951,54 @@ def get_key():
         log_info(f"Get key error: {e}")
         log_info(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/check-status', methods=['POST'])
+def check_status():
+    """Kiểm tra trạng thái processing theo stage và session"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        # Lấy dữ liệu từ request
+        data = request.get_json()
+        stage = data.get('stage')
+        session_id = data.get('sessionId')
+        
+        if not stage or not session_id:
+            return jsonify({'success': False, 'error': 'Missing stage or sessionId'}), 400
+        
+        # Lấy IP và HWID từ headers
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        hwid = request.headers.get('X-HWID', 'unknown')
+        
+        log_info(f"🔄 Status check - Stage: {stage}, Session: {session_id[:8]}..., IP: {ip_address}")
+        
+        # Mock logic - trong thực tế sẽ kiểm tra trạng thái thật từ database
+        # Tạm thời trả về completed cho tất cả các stage để test
+        import time
+        time.sleep(0.5)  # Simulate processing time
+        
+        response_data = {
+            'success': True,
+            'status': 'completed',  # pending, processing, completed, failed
+            'message': f'Stage {stage} completed successfully',
+            'stage': stage,
+            'sessionId': session_id,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        log_info(f"✅ Status check completed - Stage: {stage}")
+        return jsonify(response_data)
+        
+    except Exception as e:
+        log_info(f"Check status error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'success': False, 
+            'status': 'failed',
+            'error': str(e)
+        }), 500
+
 @app.route('/api/delete-session', methods=['POST'])
 def delete_session():
     """Xóa session/key theo ID và HWID"""

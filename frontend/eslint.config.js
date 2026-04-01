@@ -1,3 +1,10 @@
+/**
+ * @file: eslint.config.js
+ * @path: roblox/frontend/eslint.config.js
+ * @purpose: Cấu hình ESLint cho code quality và consistency
+ * @functionality: JavaScript/React linting với React Hooks và React Refresh rules
+ * @connections: Được sử dụng bởi Vite development server và build process
+ */
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'

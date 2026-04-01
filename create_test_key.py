@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 """
+ * @file: create_test_key.py
+ * @path: roblox/create_test_key.py
+ * @purpose: Script tạo Key test trong database Neon
+ * @functionality: Tạo key test KHOA-TEST-123 với expiry 24h, kết nối database Neon
+ * @connections: Kết nối đến PostgreSQL database thông qua DATABASE_URL environment variable
+"""
+"""
 Script tạo Key test trong database Neon
 Key: KHOA-TEST-123
 Expire: 24h từ thời điểm hiện tại

@@ -1,3 +1,10 @@
+/**
+ * @file: Timer.jsx
+ * @path: roblox/frontend/src/components/features/Timer.jsx
+ * @purpose: Timer component với progress ring và warnings
+ * @functionality: Countdown timer, progress visualization, warning thresholds, controls
+ * @connections: Được sử dụng trong Processing page cho time tracking
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, AlertTriangle } from 'lucide-react';

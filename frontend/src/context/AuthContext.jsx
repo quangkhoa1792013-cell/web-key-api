@@ -1,3 +1,10 @@
+/**
+ * @file: AuthContext.jsx
+ * @path: roblox/frontend/src/context/AuthContext.jsx
+ * @purpose: Context provider cho authentication state management
+ * @functionality: Session management, HWID tracking, localStorage persistence, user authentication
+ * @connections: Được sử dụng bởi tất cả components qua useAuth hook, kết nối đến localStorage
+ */
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
 // Khai báo các action types

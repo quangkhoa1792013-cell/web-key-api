@@ -1,3 +1,10 @@
+/**
+ * @file: GlassCard.jsx
+ * @path: roblox/frontend/src/components/ui/GlassCard.jsx
+ * @purpose: Glassmorphism card component với backdrop blur effects
+ * @functionality: Multiple variants, hover effects, animations, gradient overlays
+ * @connections: Được sử dụng làm container chính trong hầu hết các pages
+ */
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';

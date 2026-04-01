@@ -1,3 +1,10 @@
+/**
+ * @file: LoginPage.jsx
+ * @path: roblox/frontend/src/pages/LoginPage.jsx
+ * @purpose: Trang đăng nhập với authentication và anti-debug
+ * @functionality: Login form, anti-debug measures, HWID display, security headers
+ * @connections: Kết nối đến useAuth, useAntiCheat hooks và authApi
+ */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';

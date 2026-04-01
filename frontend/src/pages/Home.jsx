@@ -1,3 +1,10 @@
+/**
+ * @file: Home.jsx
+ * @path: roblox/frontend/src/pages/Home.jsx
+ * @purpose: Trang chủ với dashboard và key management
+ * @functionality: Key request form, status display, system information, navigation
+ * @connections: Kết nối đến useAuth, useKeySystem, useAntiCheat hooks và các UI components
+ */
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';

@@ -1,3 +1,10 @@
+"""
+ * @file: telegram_logger.py
+ * @path: roblox/backend/telegram_logger.py
+ * @purpose: Telegram logging service cho notifications và alerts
+ * @functionality: Send messages to Telegram bot, error logging, system alerts
+ * @connections: Được sử dụng bởi flask_app.py để gửi notifications
+"""
 import requests
 import os
 import time

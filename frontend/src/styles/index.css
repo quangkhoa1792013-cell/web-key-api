@@ -1,3 +1,10 @@
+/**
+ * @file: index.css
+ * @path: roblox/frontend/src/styles/index.css
+ * @purpose: Global styles với Glassmorphism design system
+ * @functionality: CSS variables, Tailwind imports, custom animations, utility classes
+ * @connections: Được import bởi main.jsx và sử dụng toàn bộ application
+ */
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';

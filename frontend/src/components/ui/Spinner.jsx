@@ -1,3 +1,10 @@
+/**
+ * @file: Spinner.jsx
+ * @path: roblox/frontend/src/components/ui/Spinner.jsx
+ * @purpose: Loading spinner components với multiple variants
+ * @functionality: Default spinner, PulseSpinner, DotsSpinner với animations
+ * @connections: Được sử dụng bởi tất cả các components khi cần loading states
+ */
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';

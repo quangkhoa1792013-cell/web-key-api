@@ -1,3 +1,10 @@
+/**
+ * @file: index.css
+ * @path: roblox/frontend/src/index.css
+ * @purpose: Root level styles và imports
+ * @functionality: Import main styles, font family setup, smooth scrolling
+ * @connections: Được import bởi main.jsx, kết nối đến styles/index.css
+ */
 /* Import main styles */
 @import './styles/index.css';
 

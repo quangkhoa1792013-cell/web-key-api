@@ -1,3 +1,10 @@
+"""
+ * @file: get_request.py
+ * @path: roblox/lootlab/get_request.py
+ * @purpose: LootLabs GET request script cho content locker data
+ * @functionality: Send GET requests to LootLabs API với query parameters
+ * @connections: Kết nối đến creators.lootlabs.gg API với API token
+"""
 import requests
 
 # API Endpoint with query parameters

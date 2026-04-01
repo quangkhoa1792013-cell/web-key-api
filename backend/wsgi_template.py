@@ -1,3 +1,10 @@
+"""
+ * @file: wsgi_template.py
+ * @path: roblox/backend/wsgi_template.py
+ * @purpose: WSGI template cho production deployment
+ * @functionality: WSGI application wrapper cho server deployment
+ * @connections: Được sử dụng cho production server configuration
+"""
 import sys
 import os
 

@@ -1,3 +1,10 @@
+--[[
+ * @file: hopsv.lua
+ * @path: roblox/lua/hopsv.lua
+ * @purpose: Roblox script cho server hopping và anti-detection
+ * @functionality: Server teleportation, GUI creation, user input handling
+ * @connections: Kết nối đến Roblox game services, TeleportService
+]]
 --[[ 
     KHOADZ SYSTEM - VERSION 0.6 (PLATINUM EDITION - ULTIMATE TROLL)
     - LO NGAY CHO TAO

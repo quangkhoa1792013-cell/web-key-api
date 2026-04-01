@@ -1,3 +1,10 @@
+/**
+ * @file: LoadingScreen.jsx
+ * @path: roblox/frontend/src/components/ui/LoadingScreen.jsx
+ * @purpose: Loading screen component cho application startup
+ * @functionality: Animated logo, progress bar, security status display
+ * @connections: Được sử dụng trong App.jsx và các pages khi cần loading
+ */
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Shield, Zap } from 'lucide-react';
