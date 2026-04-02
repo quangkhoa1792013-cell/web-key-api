@@ -45,6 +45,8 @@ export const useAntiCheat = () => {
   useEffect(() => {
     // Khởi tạo HWID khi component mount
     const initHWID = () => {
+      // DISABLED: Anti-cheat logic - Always return true
+      /*
       const storedHWID = localStorage.getItem('hwid');
       const currentHWID = generateHWID();
       
@@ -59,11 +61,16 @@ export const useAntiCheat = () => {
       setHWID(currentHWID);
       localStorage.setItem('hwid', currentHWID);
       return true;
+      */
+      
+      return true; // Always allow access
     };
 
     const isHWIDValid = initHWID();
     if (!isHWIDValid) return;
 
+    // DISABLED: Time drift detection
+    /*
     // Kiểm tra thời gian thực để chống time drift
     const timeCheckInterval = setInterval(() => {
       const now = Date.now();
@@ -80,7 +87,10 @@ export const useAntiCheat = () => {
       
       lastCheckRef.current = now;
     }, 1000);
+    */
 
+    // DISABLED: DevTools detection
+    /*
     // Kiểm tra DevTools
     const devtoolsCheck = () => {
       const threshold = 160;
@@ -92,8 +102,9 @@ export const useAntiCheat = () => {
         }
       }, 500);
     };
+    */
 
-    // Kiểm tra console đã được mở chưa
+    // DISABLED: Console and DevTools detection
     const consoleCheck = () => {
       let devtools = {
         open: false,
@@ -107,8 +118,9 @@ export const useAntiCheat = () => {
             window.outerWidth - window.innerWidth > threshold) {
           if (!devtools.open) {
             devtools.open = true;
-            console.warn('DevTools đã được mở!');
-            blockAccess();
+            console.clear();
+            console.log('%c Cảnh báo!', 'color: red; font-size: 30px; font-weight: bold;');
+            console.log('%cPhát hiện DevTools! Hệ thống sẽ bị khóa.', 'color: red; font-size: 16px;');
           }
         } else {
           devtools.open = false;
@@ -116,9 +128,17 @@ export const useAntiCheat = () => {
       }, 500);
     };
 
-    // Bắt đầu các kiểm tra
-    devtoolsCheck();
+    // DISABLED: All remaining anti-cheat logic
+    /*
+    // Khởi tạo các kiểm tra
+    let timeCheckInterval;
+    let devtoolsCheck;
     consoleCheck();
+
+    // Cleanup khi unmount
+    return () => {
+      clearInterval(timeCheckInterval);
+    };
 
     // Kiểm tra F12 và các phím tắt khác
     const handleKeyDown = (e) => {
@@ -156,6 +176,10 @@ export const useAntiCheat = () => {
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('selectstart', handleSelectStart);
     };
+    */
+
+    // Return empty cleanup function since all logic is disabled
+    return () => {};
   }, [blockAccess, setHWID]);
 
   // Hàm lấy HWID hiện tại
