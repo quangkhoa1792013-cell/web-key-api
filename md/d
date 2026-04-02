@@ -1,0 +1,125 @@
+thuc ra cai frontend nay la toi lam de vuotlink va tao key
+
+bn hay bo may cai anti khat khe di
+
+ko login j ca
+
+vi theo IP va HWID r
+
+day nhu sau
+
+
+
+URL vi du: 123.com
+
+
+
+khi ng dung ms vao thi se hien ra 1 bang la co 4 o vuong va tren day co icon, ten dich vu, da co key hay chua (neu co thi de o duoi toi lam sauu)
+
+se co lootlab
+
+linkvertise
+
+worklink
+
+pandas
+
+
+
+khi chon 1 cai thi se hien o duoi 1 hang
+
+hang do se ghi ten dich vu, tien ich cua dich vu do nhu nao
+
+nhanh hay an toan hay sao sao
+
+r o cuoi hang do se co 1 cai nut la bat dau
+
+sau khi bat dau thi no se chuyen huong den URL la 
+
+123.com/{ten_dich_vu}
+
+toi chon VD la lootlab
+
+123.com/lootlab
+
+r sau khi xong thi se do frontend vao
+
+co nghia la ap dung vs cac cai kia
+
+y v
+
+vi toi muon moi thu 1 dg
+
+o URL goc la chung
+
+Nhung nhan 1 dich vu la chia ra thay vi chung 1 cai, tranh lam phat
+
+r tiep
+
+sau khi xong thi hien 1 cai bang
+
+co cac moc tgian va moi moc la so lan vuot link
+
+4h (1 lan)
+
+8h (2 lan)
+
+16h (3 lan)
+
+24h (... voi cac so o duoi tang them 1 den het)
+
+36h
+
+42h
+
+56h
+
+67h
+
+(khung: 123.com/{dich_vu}/get-key&{tgian})
+
+sau khi chon xong va hien 1 hang ghi tgian key, vuot link may lan,...
+
+VD
+
+toi chon 24H (123.com/lootlab/get-key&24h)
+
+sau khi den cai page nhan vuot link
+
+thi phai vuot tung cai 1
+
+se co thanh tien do
+
+baonhieu/max
+
+baonhieu%
+
+thanh dai chay 
+
+cu lap the den khi day
+
+va du/max
+
+thi cai nut tao mot Key moi r nhan vao 
+
+thi se chuyen huong den 1 page khac 
+
+URL:123.com/key&{tgian vua chon o tren}-{ma ngau nhien} (goi luon ma phien lam viec moi nguoi)
+
+r bao no thiet ke trang page key do nhu nay
+se co khung to nhat la khung key
+nhu sau
+
+tgian key
+key:
+nut copy
+HWID
+tgian con lai
+den bao h
+lam tu ngay bao nheu
+...
+
+sau khi key het thi se hien 1 cai nut la tao key moi
+r lap lai buoc tren
+va cai bao mat thi de sau
+trc tien thi nhu nay da

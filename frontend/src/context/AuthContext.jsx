@@ -24,7 +24,8 @@ const initialState = {
   key: null,
   hwid: null,
   isBlocked: false,
-  isAuthenticated: false
+  isAuthenticated: true,
+  isLoading: true
 };
 
 // Reducer function để quản lý state
@@ -79,43 +80,115 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Tự động khôi phục session từ localStorage khi mount
+  // Auto-initialize session on mount
   useEffect(() => {
-    const savedSession = localStorage.getItem('sessionId');
-    const savedIP = localStorage.getItem('userIP');
-    const savedHWID = localStorage.getItem('hwid');
-    
-    if (savedSession) {
-      dispatch({ type: AUTH_ACTIONS.SET_SESSION, payload: savedSession });
-    }
-    if (savedIP) {
-      dispatch({ type: AUTH_ACTIONS.SET_IP, payload: savedIP });
-    }
-    if (savedHWID) {
-      dispatch({ type: AUTH_ACTIONS.SET_HWID, payload: savedHWID });
-    }
+    const initializeSession = async () => {
+      try {
+        // Auto-generate or retrieve HWID
+        let hwid = localStorage.getItem('hwid');
+        if (!hwid) {
+          hwid = generateHWID();
+          localStorage.setItem('hwid', hwid);
+        }
+        dispatch({ type: AUTH_ACTIONS.SET_HWID, payload: hwid });
+
+        // Auto-generate session ID
+        const sessionId = generateSessionId();
+        dispatch({ type: AUTH_ACTIONS.SET_SESSION, payload: sessionId });
+        localStorage.setItem('sessionId', sessionId);
+
+        // Get IP address
+        const ip = await getIP();
+        dispatch({ type: AUTH_ACTIONS.SET_IP, payload: ip });
+
+        // Set authenticated to true
+        dispatch({ type: AUTH_ACTIONS.SET_AUTHENTICATED, payload: true });
+        
+      } catch (error) {
+        console.error('Failed to initialize session:', error);
+        // Still set authenticated even if some parts fail
+        dispatch({ type: AUTH_ACTIONS.SET_AUTHENTICATED, payload: true });
+      } finally {
+        dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
+      }
+    };
+
+    initializeSession();
   }, []);
 
-  // Lưu vào localStorage khi state thay đổi
   useEffect(() => {
-    if (state.sessionId) {
-      localStorage.setItem('sessionId', state.sessionId);
-    } else {
-      localStorage.removeItem('sessionId');
+    try {
+      if (state.sessionId) {
+        localStorage.setItem('sessionId', state.sessionId);
+      } else {
+        localStorage.removeItem('sessionId');
+      }
+    } catch (error) {
+      console.error('Failed to save session to localStorage:', error);
     }
   }, [state.sessionId]);
 
   useEffect(() => {
-    if (state.ip) {
-      localStorage.setItem('userIP', state.ip);
+    try {
+      if (state.ip) {
+        localStorage.setItem('userIP', state.ip);
+      }
+    } catch (error) {
+      console.error('Failed to save IP to localStorage:', error);
     }
   }, [state.ip]);
 
   useEffect(() => {
-    if (state.hwid) {
-      localStorage.setItem('hwid', state.hwid);
+    try {
+      if (state.hwid) {
+        localStorage.setItem('hwid', state.hwid);
+      }
+    } catch (error) {
+      console.error('Failed to save HWID to localStorage:', error);
     }
   }, [state.hwid]);
+
+  // Auto-generate HWID
+  const generateHWID = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillText('HWID fingerprint', 2, 2);
+    const fingerprint = canvas.toDataURL();
+    
+    // Combine với browser info
+    const browserInfo = navigator.userAgent + navigator.language + screen.width + screen.height;
+    const combined = fingerprint + browserInfo;
+    
+    // Generate hash
+    let hash = 0;
+    for (let i = 0; i < combined.length; i++) {
+      const char = combined.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return 'HWID-' + Math.abs(hash).toString(16).toUpperCase();
+  };
+
+  // Auto-generate Session ID
+  const generateSessionId = () => {
+    return 'SESS-' + Math.random().toString(36).substring(2, 15).toUpperCase() + 
+           Math.random().toString(36).substring(2, 15).toUpperCase();
+  };
+
+  // Get IP from API or fallback
+  const getIP = async () => {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      // Fallback to a default IP or generate one
+      return '192.168.1.' + Math.floor(Math.random() * 254 + 1);
+    }
+  };
 
   // Action creators
   const actions = {
@@ -136,12 +209,33 @@ export const AuthProvider = ({ children }) => {
     },
     
     logout: () => {
-      dispatch({ type: AUTH_ACTIONS.LOGOUT });
-      localStorage.clear();
+      try {
+        dispatch({ type: AUTH_ACTIONS.LOGOUT });
+        localStorage.clear();
+      } catch (error) {
+        console.error('Failed to logout and clear localStorage:', error);
+        // Vẫn dispatch logout action ngay cả khi localStorage lỗi
+        dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      }
     },
     
     blockAccess: () => {
       dispatch({ type: AUTH_ACTIONS.BLOCK_ACCESS });
+    },
+    
+    // Auto-refresh session
+    refreshSession: async () => {
+      try {
+        const newSessionId = generateSessionId();
+        dispatch({ type: AUTH_ACTIONS.SET_SESSION, payload: newSessionId });
+        localStorage.setItem('sessionId', newSessionId);
+        
+        // Refresh IP
+        const ip = await getIP();
+        dispatch({ type: AUTH_ACTIONS.SET_IP, payload: ip });
+      } catch (error) {
+        console.error('Failed to refresh session:', error);
+      }
     }
   };
 

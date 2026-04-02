@@ -7,6 +7,9 @@
  */
 import axios from 'axios';
 
+// Debug: Kiểm tra API URL đã load đúng chưa
+console.log('API URL:', import.meta.env.VITE_API_BASE_URL);
+
 // Cấu hình axios instance
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -21,13 +24,46 @@ const getHWID = () => {
   return localStorage.getItem('hwid') || 'unknown';
 };
 
-// Interceptor để thêm HWID vào mọi request
+// Add request interceptor to include IP and HWID
 api.interceptors.request.use(
   (config) => {
-    // Thêm HWID header
-    config.headers['X-HWID'] = getHWID();
+    // Auto-add IP from localStorage or generate
+    let ip = localStorage.getItem('user_ip');
+    if (!ip) {
+      // Generate fallback IP if not available
+      ip = '192.168.1.' + Math.floor(Math.random() * 254 + 1);
+      localStorage.setItem('user_ip', ip);
+    }
     
-    // Thêm Session ID nếu có
+    // Auto-add HWID from localStorage or generate
+    let hwid = localStorage.getItem('hwid');
+    if (!hwid) {
+      // Generate HWID using canvas fingerprinting
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('HWID fingerprint', 2, 2);
+      const fingerprint = canvas.toDataURL();
+      const browserInfo = navigator.userAgent + navigator.language + screen.width + screen.height;
+      const combined = fingerprint + browserInfo;
+      
+      let hash = 0;
+      for (let i = 0; i < combined.length; i++) {
+        const char = combined.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      
+      hwid = 'HWID-' + Math.abs(hash).toString(16).toUpperCase();
+      localStorage.setItem('hwid', hwid);
+    }
+    
+    // Add IP and HWID to headers
+    config.headers['X-IP'] = ip;
+    config.headers['X-HWID'] = hwid;
+    
+    // Add session if available
     const sessionId = localStorage.getItem('sessionId');
     if (sessionId) {
       config.headers['X-Session-ID'] = sessionId;

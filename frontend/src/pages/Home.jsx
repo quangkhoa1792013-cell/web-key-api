@@ -17,7 +17,11 @@ import {
   ArrowRight,
   Zap,
   Lock,
-  User
+  User,
+  Package,
+  Link,
+  Globe,
+  Sparkles
 } from 'lucide-react';
 
 // Components
@@ -40,12 +44,47 @@ const Home = () => {
   const { requestKey, keyData, isLoading, error, hasKey } = useKeySystem();
   
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showKeyForm, setShowKeyForm] = useState(false);
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    reason: ''
-  });
+  const [selectedService, setSelectedService] = useState(null);
+
+  // Dữ liệu dịch vụ
+  const services = [
+    {
+      id: 'lootlabs',
+      name: 'Lootlabs',
+      icon: Package,
+      status: hasKey ? 'Đã có Key' : 'Chưa có Key',
+      hasKey: hasKey,
+      advantages: 'Nhanh',
+      color: 'blue'
+    },
+    {
+      id: 'linkvertise',
+      name: 'Linkvertise',
+      icon: Link,
+      status: hasKey ? 'Đã có Key' : 'Chưa có Key',
+      hasKey: hasKey,
+      advantages: 'An toàn',
+      color: 'green'
+    },
+    {
+      id: 'worklink',
+      name: 'Worklink',
+      icon: Globe,
+      status: hasKey ? 'Đã có Key' : 'Chưa có Key',
+      hasKey: hasKey,
+      advantages: 'Nhanh',
+      color: 'purple'
+    },
+    {
+      id: 'pandas',
+      name: 'Pandas',
+      icon: Sparkles,
+      status: hasKey ? 'Đã có Key' : 'Chưa có Key',
+      hasKey: hasKey,
+      advantages: 'An toàn',
+      color: 'orange'
+    }
+  ];
 
   // Kiểm tra trạng thái ban đầu
   useEffect(() => {
@@ -72,21 +111,6 @@ const Home = () => {
 
     initialize();
   }, [isBlocked, isAuthenticated, navigate, validateSession]);
-
-  // Handle form submission
-  const handleRequestKey = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.username.trim() || !formData.email.trim()) {
-      return;
-    }
-
-    const result = await requestKey(formData);
-    if (result) {
-      setShowKeyForm(false);
-      setFormData({ username: '', email: '', reason: '' });
-    }
-  };
 
   // Nếu chưa được khởi tạo, hiển thị loading
   if (!isInitialized) {
@@ -165,208 +189,146 @@ const Home = () => {
           className="space-y-8"
         >
           {/* Welcome section */}
-          <motion.div variants={itemVariants} className="text-center py-12">
+          <motion.div variants={itemVariants} className="text-center py-8">
             <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              <span className="text-gradient">Chào mừng đến với</span>
+              <span className="text-gradient">Chọn dịch vụ</span>
               <br />
-              <span className="text-white">Hệ thống Key Roblox</span>
+              <span className="text-white">của bạn</span>
             </h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Quản lý và xác thực key một cách an toàn với công nghệ bảo mật tiên tiến
+              Khám phá các dịch vụ Roblox key với tốc độ và bảo mật cao
             </p>
           </motion.div>
 
-          {/* Key status section */}
+          {/* Services Grid */}
           <motion.div variants={itemVariants}>
-            <GlassCard className="p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-semibold text-white flex items-center gap-3">
-                  <Key className="w-6 h-6 text-blue-500" />
-                  Trạng thái Key
-                </h3>
-                
-                {hasKey ? (
-                  <div className="flex items-center gap-2 text-green-500">
-                    <CheckCircle className="w-5 h-5" />
-                    <span className="font-medium">Đã có key</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-yellow-500">
-                    <AlertTriangle className="w-5 h-5" />
-                    <span className="font-medium">Chưa có key</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Key display hoặc form yêu cầu */}
-              {hasKey ? (
-                <KeyDisplay 
-                  keyData={keyData}
-                  className="mb-6"
-                />
-              ) : (
-                <div className="space-y-6">
-                  {!showKeyForm ? (
-                    <div className="text-center py-8">
-                      <Lock className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-                      <p className="text-gray-400 mb-6">
-                        Bạn chưa có key nào. Yêu cầu key mới để bắt đầu sử dụng hệ thống.
-                      </p>
-                      <Button
-                        onClick={() => setShowKeyForm(true)}
-                        size="lg"
-                        icon={ArrowRight}
-                      >
-                        Yêu cầu Key mới
-                      </Button>
-                    </div>
-                  ) : (
-                    <motion.form
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      onSubmit={handleRequestKey}
-                      className="space-y-4"
-                    >
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            <User className="w-4 h-4 inline mr-2" />
-                            Tên người dùng
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.username}
-                            onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                            className="cyber-input w-full px-4 py-2 rounded-lg"
-                            placeholder="Nhập tên người dùng"
-                            required
-                          />
-                        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {services.map((service, index) => {
+                const Icon = service.icon;
+                return (
+                  <motion.div
+                    key={service.id}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setSelectedService(selectedService?.id === service.id ? null : service)}
+                    className="cursor-pointer"
+                  >
+                    <GlassCard className={`p-6 hover:border-${service.color}-500/50 transition-all duration-300 ${
+                      selectedService?.id === service.id ? `border-${service.color}-500` : ''
+                    }`}>
+                      <div className="text-center">
+                        <motion.div
+                          whileHover={{ rotate: 360 }}
+                          transition={{ duration: 0.5 }}
+                          className={`w-16 h-16 mx-auto mb-4 rounded-full bg-${service.color}-500/20 flex items-center justify-center`}
+                        >
+                          <Icon className={`w-8 h-8 text-${service.color}-500`} />
+                        </motion.div>
                         
-                        <div>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Email
-                          </label>
-                          <input
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                            className="cyber-input w-full px-4 py-2 rounded-lg"
-                            placeholder="email@example.com"
-                            required
-                          />
+                        <h3 className="text-lg font-semibold text-white mb-2">
+                          {service.name}
+                        </h3>
+                        
+                        <div className={`flex items-center justify-center gap-2 text-sm ${
+                          service.hasKey ? 'text-green-500' : 'text-yellow-500'
+                        }`}>
+                          {service.hasKey ? (
+                            <>
+                              <CheckCircle className="w-4 h-4" />
+                              <span>{service.status}</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertTriangle className="w-4 h-4" />
+                              <span>{service.status}</span>
+                            </>
+                          )}
                         </div>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* Service Detail Row */}
+          <AnimatePresence>
+            {selectedService && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                variants={itemVariants}
+              >
+                <GlassCard className="p-6">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full bg-${selectedService.color}-500/20 flex items-center justify-center`}>
+                        {React.createElement(selectedService.icon, {
+                          className: `w-6 h-6 text-${selectedService.color}-500`
+                        })}
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          Lý do sử dụng (tùy chọn)
-                        </label>
-                        <textarea
-                          value={formData.reason}
-                          onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
-                          className="cyber-input w-full px-4 py-2 rounded-lg h-24 resize-none"
-                          placeholder="Mô tả lý do bạn cần key..."
-                        />
+                        <h4 className="text-xl font-semibold text-white">
+                          {selectedService.name}
+                        </h4>
+                        <p className="text-gray-400">
+                          Ưu điểm: <span className="text-green-400 font-medium">{selectedService.advantages}</span>
+                        </p>
                       </div>
+                    </div>
+                    
+                    <Button
+                      onClick={() => navigate(`/${selectedService.id}`)}
+                      icon={ArrowRight}
+                      className="px-6"
+                    >
+                      Bắt đầu
+                    </Button>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-                      {error && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm"
-                        >
-                          {error}
-                        </motion.div>
-                      )}
-
-                      <div className="flex gap-3">
-                        <Button
-                          type="submit"
-                          loading={isLoading}
-                          disabled={isLoading}
-                          icon={Zap}
-                        >
-                          {isLoading ? 'Đang xử lý...' : 'Gửi yêu cầu'}
-                        </Button>
-                        
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setShowKeyForm(false)}
-                          disabled={isLoading}
-                        >
-                          Hủy
-                        </Button>
-                      </div>
-                    </motion.form>
-                  )}
-                </div>
-              )}
-            </GlassCard>
-          </motion.div>
-
-          {/* Quick actions */}
-          {hasKey && (
-            <motion.div variants={itemVariants}>
-              <GlassCard className="p-6">
-                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                  <Zap className="w-5 h-5 text-yellow-500" />
-                  Hành động nhanh
-                </h3>
-                
-                <div className="grid md:grid-cols-3 gap-4">
-                  <Button
-                    variant="secondary"
-                    onClick={() => navigate('/processing')}
-                    icon={Clock}
-                  >
-                    Xử lý Key
-                  </Button>
-                  
-                  <Button
-                    variant="secondary"
-                    onClick={() => navigate('/result')}
-                    icon={CheckCircle}
-                  >
-                    Xem kết quả
-                  </Button>
-                  
-                  <Button
-                    variant="danger"
-                    onClick={() => {/* TODO: Implement revoke */}}
-                  >
-                    Thu hồi Key
-                  </Button>
-                </div>
-              </GlassCard>
-            </motion.div>
-          )}
-
-          {/* System info */}
+          {/* Key Status Summary */}
           <motion.div variants={itemVariants}>
             <GlassCard className="p-6">
-              <h3 className="text-xl font-semibold text-white mb-4">Thông tin hệ thống</h3>
+              <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                <Key className="w-5 h-5 text-blue-500" />
+                Trạng thái tổng quan
+              </h3>
               
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div>
-                  <p className="text-gray-400">IP Address</p>
-                  <p className="font-mono text-blue-400">{ip || 'Đang tải...'}</p>
+                  <p className="text-2xl font-bold text-blue-400">
+                    {services.filter(s => s.hasKey).length}
+                  </p>
+                  <p className="text-sm text-gray-400">Dịch vụ có key</p>
                 </div>
                 
                 <div>
-                  <p className="text-gray-400">Session</p>
-                  <p className="font-mono text-green-400">Hoạt động</p>
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {services.filter(s => !s.hasKey).length}
+                  </p>
+                  <p className="text-sm text-gray-400">Cần key</p>
                 </div>
                 
                 <div>
-                  <p className="text-gray-400">Bảo mật</p>
-                  <p className="font-mono text-green-400">Đã kích hoạt</p>
+                  <p className="text-2xl font-bold text-green-400">
+                    {services.filter(s => s.advantages === 'Nhanh').length}
+                  </p>
+                  <p className="text-sm text-gray-400">Dịch vụ nhanh</p>
                 </div>
                 
                 <div>
-                  <p className="text-gray-400">Trạng thái</p>
-                  <p className="font-mono text-blue-400">Bình thường</p>
+                  <p className="text-2xl font-bold text-purple-400">
+                    {services.filter(s => s.advantages === 'An toàn').length}
+                  </p>
+                  <p className="text-sm text-gray-400">Dịch vụ an toàn</p>
                 </div>
               </div>
             </GlassCard>
