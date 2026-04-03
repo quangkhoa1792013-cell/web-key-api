@@ -14,7 +14,9 @@ const AUTH_ACTIONS = {
   SET_KEY: 'SET_KEY',
   LOGOUT: 'LOGOUT',
   SET_HWID: 'SET_HWID',
-  BLOCK_ACCESS: 'BLOCK_ACCESS'
+  BLOCK_ACCESS: 'BLOCK_ACCESS',
+  SET_AUTHENTICATED: 'SET_AUTHENTICATED',
+  SET_LOADING: 'SET_LOADING'
 };
 
 // State ban đầu
@@ -66,6 +68,18 @@ const authReducer = (state, action) => {
         ...state,
         isBlocked: true,
         isAuthenticated: false
+      };
+    
+    case AUTH_ACTIONS.SET_AUTHENTICATED:
+      return {
+        ...state,
+        isAuthenticated: action.payload
+      };
+    
+    case AUTH_ACTIONS.SET_LOADING:
+      return {
+        ...state,
+        isLoading: action.payload
       };
     
     default:

@@ -13,6 +13,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import DynamicPage from './pages/DynamicPage';
 import BlockedPage from './pages/BlockedPage';
 
+// Components
+import LoadingScreen from './components/ui/LoadingScreen';
+
 // Hooks
 import { useAuth } from './context/AuthContext';
 
