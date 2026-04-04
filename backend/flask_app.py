@@ -15,7 +15,7 @@ import string
 import logging
 import sys
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, redirect
 from flask_cors import CORS
 from urllib.parse import urlparse
 from dotenv import load_dotenv
@@ -973,21 +973,69 @@ def check_status():
         
         log_info(f"🔄 Status check - Stage: {stage}, Session: {session_id[:8]}..., IP: {ip_address}")
         
-        # Mock logic - trong thực tế sẽ kiểm tra trạng thái thật từ database
-        # Tạm thời trả về completed cho tất cả các stage để test
-        import time
-        time.sleep(0.5)  # Simulate processing time
+        # Query database for real session status
+        check_query = """
+        SELECT id, service, status, process_completed, verification_steps, expire_ts, created_at
+        FROM user_sessions 
+        WHERE key = %s OR id = %s
+        """
+        
+        result = key_system.execute_query(check_query, (session_id, session_id), fetch_one=True)
+        
+        if not result:
+            log_info(f"❌ Session not found: {session_id[:8]}...")
+            return jsonify({
+                'success': False,
+                'status': 'failed',
+                'error': 'Session not found',
+                'stage': stage,
+                'sessionId': session_id
+            }), 404
+        
+        db_id, service, status, process_completed, verification_steps, expire_ts, created_at = result
+        current_time = int(time.time())
+        
+        # Check if session has expired
+        if expire_ts <= current_time:
+            log_info(f"❌ Session expired: {session_id[:8]}...")
+            return jsonify({
+                'success': False,
+                'status': 'failed',
+                'error': 'Session has expired',
+                'stage': stage,
+                'sessionId': session_id,
+                'expiredAt': expire_ts
+            }), 403
+        
+        # Determine status based on verification steps and process completion
+        if process_completed:
+            response_status = 'completed'
+            message = f'All stages completed successfully for {service}'
+        elif verification_steps >= 4:  # Assuming 4 verification steps
+            response_status = 'completed'
+            message = f'Verification completed for {service}'
+        elif verification_steps >= int(stage):
+            response_status = 'completed'
+            message = f'Stage {stage} completed successfully'
+        else:
+            response_status = 'processing'
+            message = f'Stage {stage} in progress'
         
         response_data = {
             'success': True,
-            'status': 'completed',  # pending, processing, completed, failed
-            'message': f'Stage {stage} completed successfully',
+            'status': response_status,
+            'message': message,
             'stage': stage,
             'sessionId': session_id,
+            'service': service,
+            'verificationSteps': verification_steps,
+            'processCompleted': process_completed,
+            'expireTs': expire_ts,
+            'timeLeft': expire_ts - current_time,
             'timestamp': datetime.now().isoformat()
         }
         
-        log_info(f"✅ Status check completed - Stage: {stage}")
+        log_info(f"✅ Status check - {response_status}: Stage {stage}, Session: {session_id[:8]}...")
         return jsonify(response_data)
         
     except Exception as e:
@@ -1296,85 +1344,6 @@ def validate_key_access(key_id, service_name, hwid, ip_address, target_url):
             'message': 'Key validation failed',
             'service': service_name
         }), 500
-
-@app.route('/api/mark-session', methods=['POST'])
-def mark_session_start():
-    """Mark session start with IP and HWID for anti-sharing protection"""
-    try:
-        if not key_system:
-            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
-        
-        data = request.get_json()
-        service_name = data.get('service')
-        duration = data.get('duration')
-        
-        if not service_name or not duration:
-            return jsonify({'success': False, 'error': 'Missing service or duration'}), 400
-        
-        # Lấy user info
-        user_agent = request.headers.get('User-Agent', 'Unknown')
-        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
-        hwid = extract_hwid()
-        
-        # Tạo session identifier duy nhất cho tiến trình này
-        import hashlib
-        import time
-        session_seed = f"{service_name}_{duration}_{ip_address}_{hwid}_{int(time.time())}"
-        session_hash = hashlib.md5(session_seed.encode()).hexdigest()[:16].upper()
-        session_ip_hwid = f"{ip_address}_{hwid}"
-        
-        # Lưu session với anti-sharing protection
-        insert_query = """
-        INSERT INTO user_sessions (
-            key, service, status, ip_address, expire_ts, hwid, 
-            cookies, process_completed, verification_steps, 
-            session_ip_hwid, session_locked, created_at
-        ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
-        )
-        """
-        
-        # Tính thời gian hết hạn tạm thời (2 giờ cho process)
-        current_time = int(time.time())
-        process_expire_ts = current_time + (2 * 60 * 60)  # 2 hours
-        
-        # Chuẩn bị cookies JSON
-        cookies_data = {
-            'user_agent': user_agent,
-            'start_time': current_time,
-            'service': service_name,
-            'duration': duration
-        }
-        cookies_json = json.dumps(cookies_data)
-        
-        params = (
-            f"PROCESS_{session_hash}", service_name, 'PROCESSING',
-            ip_address, process_expire_ts, hwid, cookies_json,
-            False, 0, session_ip_hwid, True
-        )
-        
-        result = key_system.execute_query(insert_query, params)
-        
-        if result:
-            process_id = f"PROCESS_{session_hash}"
-            log_info(f"🔒 Anti-Sharing: Started verification process for {service_name}. Session ID: {process_id}, IP+HWID: {session_ip_hwid}")
-            
-            return jsonify({
-                'success': True,
-                'processId': process_id,
-                'service': service_name,
-                'duration': duration,
-                'expireTs': process_expire_ts,
-                'message': 'Verification process started successfully'
-            })
-        else:
-            log_info(f"❌ Failed to start verification process for {service_name}")
-            return jsonify({'success': False, 'error': 'Failed to start process'}), 500
-            
-    except Exception as e:
-        log_info(f"Mark session error: {e}")
-        log_info(f"Traceback: {traceback.format_exc()}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/start-process', methods=['POST'])
 def start_verification_process():
@@ -1812,6 +1781,128 @@ def home():
             'message': str(e)
         }), 500
 
+@app.route('/api/validate-key', methods=['POST'])
+def validate_key():
+    """Validate key for Roblox script - checks user_sessions table"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        key_value = data.get('key')
+        hwid = data.get('hwid')
+        
+        if not key_value or not hwid:
+            return jsonify({'success': False, 'error': 'Missing key or hwid'}), 400
+        
+        # Get IP from request
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        
+        log_info(f"🔑 Roblox Key Validation - Key: {key_value[:8]}..., HWID: {hwid[:16]}..., IP: {ip_address}")
+        
+        # Check if key exists in user_sessions table
+        check_query = """
+        SELECT id, service, status, ip_address, hwid, expire_ts, process_completed
+        FROM user_sessions 
+        WHERE key = %s AND status = 'ACTIVE' AND expire_ts > %s
+        """
+        
+        current_time = int(time.time())
+        result = key_system.execute_query(check_query, (key_value, current_time), fetch_one=True)
+        
+        if not result:
+            log_info(f"❌ Roblox Key Validation Failed - Key not found or expired: {key_value[:8]}...")
+            return jsonify({
+                'success': False,
+                'error': 'Key không hợp lệ hoặc đã hết hạn',
+                'code': 'KEY_INVALID'
+            }), 403
+        
+        session_id, service, status, stored_ip, stored_hwid, expire_ts, process_completed = result
+        
+        # Check HWID match
+        if stored_hwid != hwid:
+            log_info(f"❌ Roblox HWID Mismatch - Expected: {stored_hwid[:16]}..., Got: {hwid[:16]}...")
+            return jsonify({
+                'success': False,
+                'error': 'HWID không khớp',
+                'code': 'HWID_MISMATCH'
+            }), 403
+        
+        log_info(f"✅ Roblox Key Validation Success - Key: {key_value[:8]}..., Service: {service}")
+        return jsonify({
+            'success': True,
+            'service': service,
+            'expireTs': expire_ts,
+            'message': 'Key hợp lệ'
+        })
+        
+    except Exception as e:
+        log_info(f"Roblox validate key error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/heartbeat', methods=['POST'])
+def heartbeat():
+    """Heartbeat endpoint for Roblox script to maintain session"""
+    try:
+        if not key_system:
+            return jsonify({'success': False, 'error': 'Key system not initialized'}), 500
+        
+        data = request.get_json()
+        key_value = data.get('key')
+        hwid = data.get('hwid')
+        
+        if not key_value or not hwid:
+            return jsonify({'success': False, 'error': 'Missing key or hwid'}), 400
+        
+        # Get IP from request
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        
+        log_info(f"💓 Roblox Heartbeat - Key: {key_value[:8]}..., HWID: {hwid[:16]}...")
+        
+        # Check if session exists and is active
+        check_query = """
+        SELECT id, service, status, expire_ts, last_heartbeat
+        FROM user_sessions 
+        WHERE key = %s AND status = 'ACTIVE' AND expire_ts > %s
+        """
+        
+        current_time = int(time.time())
+        result = key_system.execute_query(check_query, (key_value, current_time), fetch_one=True)
+        
+        if not result:
+            return jsonify({
+                'success': False,
+                'error': 'Session không tồn tại hoặc đã hết hạn',
+                'code': 'SESSION_EXPIRED'
+            }), 403
+        
+        session_id, service, status, expire_ts, last_heartbeat = result
+        
+        # Update last heartbeat
+        update_query = """
+        UPDATE user_sessions 
+        SET last_heartbeat = %s 
+        WHERE id = %s
+        """
+        
+        key_system.execute_query(update_query, (current_time, session_id))
+        
+        log_info(f"💓 Roblox Heartbeat Updated - Key: {key_value[:8]}..., Service: {service}")
+        return jsonify({
+            'success': True,
+            'service': service,
+            'expireTs': expire_ts,
+            'timestamp': current_time,
+            'message': 'Heartbeat received'
+        })
+        
+    except Exception as e:
+        log_info(f"Roblox heartbeat error: {e}")
+        log_info(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -1834,7 +1925,9 @@ def list_routes():
         '/api/mark-session',
         '/api/check-session-mark',
         '/api/check-service-keys',
-        '/api/anti-cheat-check'
+        '/api/anti-cheat-check',
+        '/api/validate-key',
+        '/api/heartbeat'
     ]
     return jsonify({
         'routes': routes,

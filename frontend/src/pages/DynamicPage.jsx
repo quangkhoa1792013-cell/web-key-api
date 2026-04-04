@@ -6,7 +6,7 @@
  * @connections: Kết nối đến useAuth, useKeySystem, useAntiCheat
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -75,6 +75,12 @@ const milestones = [
   { hours: 67, bypasses: 10 }
 ];
 
+// Helper: lấy số bypasses theo time
+const getBypassesForTime = (hours) => {
+  const milestone = milestones.find(m => m.hours === hours);
+  return milestone ? milestone.bypasses : 10;
+};
+
 // DynamicPage Component
 const DynamicPage = () => {
   // Get URL params with fallbacks
@@ -84,8 +90,8 @@ const DynamicPage = () => {
   const urlSessionId = params.sessionId || '';
   const navigate = useNavigate();
   
-  // Auth and system hooks
-  const { sessionId, ip, isAuthenticated, isBlocked } = useAuth();
+  // Auth hooks
+  const { sessionId, ip } = useAuth();
   
   // State
   const [viewType, setViewType] = useState('home'); // home | service | progress | key
@@ -95,24 +101,80 @@ const DynamicPage = () => {
   const [progress, setProgress] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(null);
   const [isExpired, setIsExpired] = useState(false);
+  
+  // Refs để tránh stale closures
+  const progressIntervalRef = useRef(null);
+  const expirationIntervalRef = useRef(null);
+
+  // Cleanup intervals khi unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      if (expirationIntervalRef.current) clearInterval(expirationIntervalRef.current);
+    };
+  }, []);
 
   // Parse URL and set view type
   useEffect(() => {
-    // Determine view type based on available params
-    if (serviceName && time && urlSessionId) {
+    // Cleanup previous intervals
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    if (expirationIntervalRef.current) {
+      clearInterval(expirationIntervalRef.current);
+      expirationIntervalRef.current = null;
+    }
+
+    // Determine view type based on URL path
+    const path = window.location.pathname;
+    
+    if (path.startsWith('/key/') && time && urlSessionId) {
       // /key/:time/:sessionId pattern
+      const parsedTime = parseInt(time);
       setViewType('key');
-      setSelectedTime(parseInt(time));
+      setSelectedTime(parsedTime);
       setCurrentSession(urlSessionId);
-      generateKeyData(parseInt(time), urlSessionId);
+      setIsExpired(false);
+      
+      // Setup expiration check
+      const expireDate = new Date(Date.now() + (parsedTime * 60 * 60 * 1000));
+      const checkExpiration = () => {
+        setIsExpired(new Date() >= expireDate);
+      };
+      checkExpiration();
+      expirationIntervalRef.current = setInterval(checkExpiration, 1000);
+      
     } else if (serviceName && time) {
       // /:serviceName/get-key/:time pattern
+      const parsedTime = parseInt(time);
+      const service = services[serviceName];
       setViewType('progress');
-      setCurrentService(services[serviceName]);
-      setSelectedTime(parseInt(time));
-      startProgressSimulation();
+      setCurrentService(service || null);
+      setSelectedTime(parsedTime);
+      setProgress(0);
+      setIsCompleted(false);
+      
+      // Start progress simulation
+      if (service) {
+        const maxLinks = getBypassesForTime(parsedTime);
+        let currentProgress = 0;
+        progressIntervalRef.current = setInterval(() => {
+          currentProgress += 1;
+          if (currentProgress >= maxLinks) {
+            setProgress(maxLinks);
+            setIsCompleted(true);
+            if (progressIntervalRef.current) {
+              clearInterval(progressIntervalRef.current);
+              progressIntervalRef.current = null;
+            }
+          } else {
+            setProgress(currentProgress);
+          }
+        }, 1000);
+      }
+      
     } else if (serviceName) {
       // /:serviceName pattern
       if (services[serviceName]) {
@@ -120,58 +182,15 @@ const DynamicPage = () => {
         setCurrentService(services[serviceName]);
         setSelectedTime(null);
       } else {
-        // Invalid service name, redirect to home
         setViewType('home');
       }
     } else {
-      // No params, home view
       setViewType('home');
     }
   }, [serviceName, time, urlSessionId]);
 
-  // Progress simulation
-  const startProgressSimulation = () => {
-    setProgress(0);
-    setIsCompleted(false);
-    
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        const newProgress = prev + 1;
-        if (newProgress >= milestones.find(m => m.hours === selectedTime)?.bypasses || 10) {
-          setIsCompleted(true);
-          clearInterval(interval);
-          return milestones.find(m => m.hours === selectedTime)?.bypasses || 10;
-        }
-        return newProgress;
-      });
-    }, 1000);
-  };
-
-  // Generate key data with automatic expiration calculation
-  const generateKeyData = (time, session) => {
-    const key = `ROBLOX-KEY-${time}H-${session.toUpperCase()}`;
-    const now = new Date();
-    const expireDate = new Date(now.getTime() + (time * 60 * 60 * 1000));
-    
-    // Set time left for countdown
-    setTimeLeft(expireDate);
-    
-    // Auto-calculate expiration status
-    const checkExpiration = () => {
-      const current = new Date();
-      setIsExpired(current >= expireDate);
-    };
-    
-    // Check immediately and then every second
-    checkExpiration();
-    const expirationInterval = setInterval(checkExpiration, 1000);
-    
-    // Cleanup interval
-    return () => clearInterval(expirationInterval);
-  };
-
   // Copy key to clipboard
-  const copyKey = async () => {
+  const copyKey = useCallback(async () => {
     const key = `ROBLOX-KEY-${selectedTime}H-${currentSession?.toUpperCase()}`;
     try {
       await navigator.clipboard.writeText(key);
@@ -180,19 +199,19 @@ const DynamicPage = () => {
     } catch (error) {
       console.error('Failed to copy key:', error);
     }
-  };
+  }, [selectedTime, currentSession]);
 
   // Navigate functions
   const navigateToService = (serviceId) => {
     navigate(`/${serviceId}`);
   };
 
-  const navigateToProgress = (serviceId, time) => {
-    navigate(`/${serviceId}/get-key/${time}`);
+  const navigateToProgress = (serviceId, hours) => {
+    navigate(`/${serviceId}/get-key/${hours}`);
   };
 
-  const navigateToKey = (time, session) => {
-    navigate(`/key/${time}/${session}`);
+  const navigateToKey = (hours, session) => {
+    navigate(`/key/${hours}/${session}`);
   };
 
   const navigateHome = () => {
@@ -238,14 +257,14 @@ const DynamicPage = () => {
                 className="cursor-pointer"
               >
                 <GlassCard className="p-6 text-center hover:shadow-2xl transition-all duration-300">
-                  <div className={`w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-${service.color}-500 to-${service.color}-600 flex items-center justify-center`}>
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 flex items-center justify-center">
                     <Icon className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2">{service.name}</h3>
                   <p className="text-gray-300 text-sm mb-3">{service.description}</p>
                   <div className="flex flex-wrap gap-1 justify-center mb-3">
                     {service.advantages.map((advantage, idx) => (
-                      <span key={idx} className={`px-2 py-1 bg-${service.color}-500/20 text-${service.color}-300 text-xs rounded-full`}>
+                      <span key={idx} className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full">
                         {advantage}
                       </span>
                     ))}
@@ -293,7 +312,7 @@ const DynamicPage = () => {
             
             <GlassCard className="p-8">
               <div className="flex items-center mb-6">
-                <div className={`w-20 h-20 rounded-full bg-gradient-to-r from-${currentService.color}-500 to-${currentService.color}-600 flex items-center justify-center mr-6`}>
+                <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mr-6">
                   <Icon className="w-10 h-10 text-white" />
                 </div>
                 <div>
@@ -304,7 +323,7 @@ const DynamicPage = () => {
               
               <div className="flex flex-wrap gap-2 mb-6">
                 {currentService.advantages.map((advantage, idx) => (
-                  <span key={idx} className={`px-3 py-1 bg-${currentService.color}-500/20 text-${currentService.color}-300 rounded-full`}>
+                  <span key={idx} className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full">
                     {advantage}
                   </span>
                 ))}
@@ -364,7 +383,7 @@ const DynamicPage = () => {
   const renderProgress = () => {
     if (!currentService || !selectedTime) return renderHome();
     
-    const maxLinks = milestones.find(m => m.hours === selectedTime)?.bypasses || 10;
+    const maxLinks = getBypassesForTime(selectedTime);
     const percentage = Math.round((progress / maxLinks) * 100);
     
     return (
@@ -380,7 +399,7 @@ const DynamicPage = () => {
             <div className="text-center mb-8">
               <div className="flex items-center justify-center mb-4">
                 {React.createElement(currentService.icon, {
-                  className: `w-16 h-16 text-${currentService.color}-500`
+                  className: 'w-16 h-16 text-blue-500'
                 })}
               </div>
               <h1 className="text-3xl font-bold text-white mb-2">
@@ -535,11 +554,10 @@ const DynamicPage = () => {
             </div>
 
             {/* Actions */}
-            <div className="text-center space-y-4">
+            <div className="text-center space-x-4">
               <Button
                 onClick={navigateHome}
                 variant="ghost"
-                className="mr-4"
               >
                 <Home className="w-4 h-4 mr-2" />
                 Về trang chủ

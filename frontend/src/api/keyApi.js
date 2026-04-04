@@ -26,13 +26,20 @@ const getHWID = () => {
 
 // Add request interceptor to include IP and HWID
 api.interceptors.request.use(
-  (config) => {
-    // Auto-add IP from localStorage or generate
+  async (config) => {
+    // Get real IP from api.ipify.org or use existing
     let ip = localStorage.getItem('user_ip');
     if (!ip) {
-      // Generate fallback IP if not available
-      ip = '192.168.1.' + Math.floor(Math.random() * 254 + 1);
-      localStorage.setItem('user_ip', ip);
+      try {
+        // Fetch real IP
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        ip = data.ip;
+        localStorage.setItem('user_ip', ip);
+      } catch (error) {
+        console.warn('Failed to fetch real IP, using fallback');
+        ip = null; // Let backend handle IP via X-Forwarded-For
+      }
     }
     
     // Auto-add HWID from localStorage or generate
@@ -60,7 +67,9 @@ api.interceptors.request.use(
     }
     
     // Add IP and HWID to headers
-    config.headers['X-IP'] = ip;
+    if (ip) {
+      config.headers['X-IP'] = ip;
+    }
     config.headers['X-HWID'] = hwid;
     
     // Add session if available
@@ -132,60 +141,111 @@ api.interceptors.response.use(
 
 // API functions cho key system
 export const keyApi = {
-  // Yêu cầu key mới
-  requestKey: async (userData) => {
-    const response = await api.post('/key/request', userData);
+  // Mark session trước khi chuyển trang
+  markSession: async (userData) => {
+    const response = await api.post('/api/mark-session', userData);
     return response.data;
   },
 
-  // Xác thực key
-  verifyKey: async (data) => {
-    const response = await api.post('/key/verify', data);
+  // Check key status
+  checkKeyStatus: async (service) => {
+    const response = await api.post('/api/check-key-status', { service });
     return response.data;
   },
 
-  // Lấy thông tin key
-  getKeyInfo: async (data) => {
-    const response = await api.post('/key/info', data);
+  // Verify session
+  verifySession: async (sessionToken) => {
+    const response = await api.post('/api/verify-session', { sessionToken });
     return response.data;
   },
 
-  // Hủy key
-  revokeKey: async (data) => {
-    const response = await api.post('/key/revoke', data);
+  // Check session mark
+  checkSessionMark: async (serviceId) => {
+    const response = await api.post('/api/check-session-mark', { serviceId });
     return response.data;
   },
 
-  // Lấy lịch sử key
-  getKeyHistory: async (params = {}) => {
-    const response = await api.get('/key/history', { params });
+  // Check status
+  checkStatus: async (stage, sessionId) => {
+    const response = await api.post('/api/check-status', { stage, sessionId });
     return response.data;
   },
 
-  // Kiểm tra giới hạn key
-  checkKeyLimit: async () => {
-    const response = await api.get('/key/limit');
+  // Start verification process
+  startProcess: async (service, duration) => {
+    const response = await api.post('/api/start-process', { service, duration });
+    return response.data;
+  },
+
+  // Generate key
+  generateKey: async (service, duration) => {
+    const response = await api.post('/api/generate-key', { service, duration });
+    return response.data;
+  },
+
+  // Delete session
+  deleteSession: async (sessionId, hwid) => {
+    const response = await api.post('/api/delete-session', { sessionId, hwid });
+    return response.data;
+  },
+
+  // Get key info
+  getKeyInfo: async (keyId) => {
+    const response = await api.get(`/api/get-key?id=${keyId}`);
+    return response.data;
+  },
+
+  // Anti-cheat check
+  antiCheatCheck: async (clientTime, key) => {
+    const response = await api.post('/api/anti-cheat-check', { client_time: clientTime, key });
     return response.data;
   }
 };
 
 // API functions cho authentication
 export const authApi = {
-  // Lấy session mới
-  getSession: async () => {
-    const response = await api.post('/auth/session');
+  // Health check
+  healthCheck: async () => {
+    const response = await api.get('/api/health');
     return response.data;
   },
 
-  // Xác thực session
-  validateSession: async (sessionId) => {
-    const response = await api.post('/auth/validate', { sessionId });
+  // Test database
+  testDb: async () => {
+    const response = await api.get('/api/test-db');
     return response.data;
   },
 
-  // Lấy IP của user
+  // Track service access
+  trackServiceAccess: async (service, path) => {
+    const response = await api.post('/api/track-service-access', { service, path });
+    return response.data;
+  },
+
+  // Get user IP (sử dụng api.ipify.org)
   getUserIP: async () => {
-    const response = await api.get('/auth/ip');
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      console.error('Failed to get IP:', error);
+      return null;
+    }
+  }
+};
+
+// API functions cho Roblox script
+export const robloxApi = {
+  // Validate key
+  validateKey: async (key, hwid) => {
+    const response = await api.post('/api/validate-key', { key, hwid });
+    return response.data;
+  },
+
+  // Heartbeat
+  heartbeat: async (key, hwid) => {
+    const response = await api.post('/api/heartbeat', { key, hwid });
     return response.data;
   }
 };

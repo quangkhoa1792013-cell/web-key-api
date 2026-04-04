@@ -35,6 +35,7 @@ import AntiCheatBadge from '../components/features/AntiCheatBadge';
 import { useAuth } from '../context/AuthContext';
 import { useAntiCheat } from '../hooks/useAntiCheat';
 import { useKeySystem } from '../hooks/useKeySystem';
+import { keyApi } from '../api/keyApi';
 
 const GetKeyPage = () => {
   const navigate = useNavigate();
@@ -47,6 +48,9 @@ const GetKeyPage = () => {
   const [currentProgress, setCurrentProgress] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [pollingStage, setPollingStage] = useState(1);
+  const [isPolling, setIsPolling] = useState(false);
 
   // Extract time from URL parameter
   const selectedTime = time || '24';
@@ -98,7 +102,7 @@ const GetKeyPage = () => {
   const maxLinks = getTimeBasedLinks(selectedTime);
   const percentage = Math.round((currentProgress / maxLinks) * 100);
 
-  // Kiểm tra trạng thái ban đầu
+  // Kiểm tra trạng thái ban đầu và bắt đầu polling
   useEffect(() => {
     const initialize = async () => {
       if (isBlocked) {
@@ -106,27 +110,57 @@ const GetKeyPage = () => {
         return;
       }
 
-      // No login needed - always authenticated
+      try {
+        // Mark session start
+        const response = await keyApi.markSession({
+          serviceId: serviceName,
+          duration: `${selectedTime}h`
+        });
+        
+        if (response.success) {
+          setCurrentSessionId(response.processId || response.sessionId);
+          setIsPolling(true);
+          startPolling();
+        }
+      } catch (error) {
+        console.error('Failed to start session:', error);
+      }
+
       setIsInitialized(true);
-      // Start progress simulation
-      startProgressSimulation();
     };
 
     initialize();
-  }, [isBlocked, navigate]);
+  }, [isBlocked, navigate, serviceName, selectedTime]);
 
-  // Simulate progress
-  const startProgressSimulation = () => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 1;
-      setCurrentProgress(progress);
-      
-      if (progress >= maxLinks) {
-        clearInterval(interval);
-        setIsCompleted(true);
+  // Real polling mechanism
+  const startPolling = () => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await keyApi.checkStatus(pollingStage, currentSessionId);
+        
+        if (response.success && response.status === 'completed') {
+          // Move to next stage or complete
+          if (pollingStage < maxLinks) {
+            setPollingStage(prev => prev + 1);
+            setCurrentProgress(prev => prev + 1);
+          } else {
+            // All stages completed
+            setIsCompleted(true);
+            setIsPolling(false);
+            clearInterval(pollInterval);
+          }
+        } else if (response.status === 'failed') {
+          console.error('Polling failed:', response.error);
+          setIsPolling(false);
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
       }
-    }, 2000); // 2s per link
+    }, 3000); // Poll every 3 seconds
+
+    // Cleanup on unmount
+    return () => clearInterval(pollInterval);
   };
 
   // Generate random session ID
@@ -136,15 +170,23 @@ const GetKeyPage = () => {
   };
 
   // Handle key generation
-  const handleGenerateKey = () => {
+  const handleGenerateKey = async () => {
     setIsGenerating(true);
     
-    // Simulate key generation
-    setTimeout(() => {
-      const randomSession = generateSessionId();
-      // Navigate to result page with new URL format
-      navigate(`/key/${selectedTime}/${randomSession}`);
-    }, 1500);
+    try {
+      const response = await keyApi.generateKey(serviceName, `${selectedTime}h`);
+      
+      if (response.success) {
+        // Navigate to result page with real key
+        navigate(`/key/${selectedTime}/${response.keyId}`);
+      } else {
+        console.error('Key generation failed:', response.error);
+      }
+    } catch (error) {
+      console.error('Key generation error:', error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Nếu chưa được khởi tạo, hiển thị loading
@@ -177,10 +219,52 @@ const GetKeyPage = () => {
   const Icon = service.icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900/20 to-gray-900">
-      {/* Background effects */}
-      <div className="fixed inset-0 bg-grid opacity-20" />
-      <div className="fixed inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/30 to-slate-950 relative overflow-hidden">
+      {/* Enhanced background effects */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
+      <div className="fixed inset-0 bg-grid opacity-10" />
+      <div className="fixed inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+      
+      {/* Animated floating orbs */}
+      <motion.div
+        animate={{ 
+          x: [0, 100, 0],
+          y: [0, -100, 0],
+          scale: [1, 1.2, 1]
+        }}
+        transition={{ 
+          duration: 20,
+          repeat: Infinity,
+          ease: 'easeInOut'
+        }}
+        className="absolute top-20 left-20 w-32 h-32 bg-purple-500/20 rounded-full blur-xl"
+      />
+      <motion.div
+        animate={{ 
+          x: [0, -100, 0],
+          y: [0, 100, 0],
+          scale: [1, 0.8, 1]
+        }}
+        transition={{ 
+          duration: 15,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 5
+        }}
+        className="absolute bottom-20 right-20 w-40 h-40 bg-blue-500/20 rounded-full blur-xl"
+      />
+      <motion.div
+        animate={{ 
+          x: [0, 50, -50, 0],
+          y: [0, -50, 50, 0],
+        }}
+        transition={{ 
+          duration: 25,
+          repeat: Infinity,
+          ease: 'linear'
+        }}
+        className="absolute top-1/2 left-1/3 w-24 h-24 bg-pink-500/20 rounded-full blur-xl"
+      />
       
       {/* Header */}
       <motion.header
@@ -236,7 +320,7 @@ const GetKeyPage = () => {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <GlassCard className="p-8">
+            <GlassCard className="p-8" variant="neon" glow={true}>
               <div className="text-center mb-8">
                 <motion.div
                   animate={{ rotate: 360 }}
@@ -323,7 +407,7 @@ const GetKeyPage = () => {
                   >
                     <Spinner size="sm" />
                     <span className="text-gray-300">
-                      Đang vượt link {currentProgress + 1}/{maxLinks}...
+                      {isPolling ? `Đang kiểm tra trạng thái stage ${pollingStage}/${maxLinks}...` : `Đang xử lý ${currentProgress + 1}/${maxLinks}...`}
                     </span>
                   </motion.div>
                 ) : (
@@ -334,7 +418,7 @@ const GetKeyPage = () => {
                   >
                     <CheckCircle className="w-5 h-5" />
                     <span className="font-semibold">
-                      Hoàn thành! Tất cả {maxLinks} links đã được vượt qua.
+                      Hoàn thành! Tất cả {maxLinks} stages đã được xử lý.
                     </span>
                   </motion.div>
                 )}
@@ -426,7 +510,7 @@ const GetKeyPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            <GlassCard className="p-6">
+            <GlassCard className="p-6" variant="gradient" glow={true}>
               <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-blue-500" />
                 Thông tin xử lý

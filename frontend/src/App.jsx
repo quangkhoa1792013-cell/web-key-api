@@ -5,13 +5,16 @@
  * @functionality: React Router setup, route guards, page transitions, background effects
  * @connections: Kết nối đến tất cả pages, AuthContext, useAntiCheat hook
  */
-import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Pages
 import DynamicPage from './pages/DynamicPage';
 import BlockedPage from './pages/BlockedPage';
+
+// Components
+import LoadingScreen from './components/ui/LoadingScreen';
 
 // Hooks
 import { useAuth } from './context/AuthContext';
@@ -22,6 +25,20 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [initError, setInitError] = useState(null);
   const { isAuthenticated, sessionId, isBlocked, isLoading: authLoading } = useAuth();
+
+  // Tạo particle positions 1 lần duy nhất để tránh re-render liên tục
+  const particles = useMemo(() => {
+    return [...Array(20)].map(() => ({
+      x1: Math.random() * 1200,
+      y1: Math.random() * 800,
+      x2: Math.random() * 1200,
+      y2: Math.random() * 800,
+      left: Math.random() * 1200,
+      top: Math.random() * 800,
+      duration: Math.random() * 10 + 10,
+      delay: Math.random() * 5
+    }));
+  }, []);
 
   // Initialize app
   useEffect(() => {
@@ -38,22 +55,19 @@ const App = () => {
           return;
         }
 
-        // Auto-redirect to home since no login needed
-        navigate('/home');
       } catch (error) {
         console.error('App initialization failed:', error);
-        // Still redirect to home even on error
-        navigate('/home');
+        setInitError(error.message);
       } finally {
         setIsLoading(false);
       }
     };
 
     initializeApp();
-  }, [isAuthenticated, isBlocked, authLoading, navigate]);
+  }, [isBlocked, authLoading, navigate]);
 
   // Hiển thị loading screen khi khởi tạo
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return <LoadingScreen />;
   }
 
@@ -70,9 +84,6 @@ const App = () => {
           >
             Tải lại trang
           </button>
-          <p className="text-sm text-gray-400 mt-4">
-            Hoặc truy cập
-          </p>
         </div>
       </div>
     );
@@ -109,147 +120,147 @@ const App = () => {
       <div className="fixed inset-0 bg-grid opacity-20" />
       <div className="fixed inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         
-        {/* Animated background particles */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          {[...Array(20)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 bg-blue-500/30 rounded-full"
-              animate={{
-                x: [Math.random() * window.innerWidth, Math.random() * window.innerWidth],
-                y: [Math.random() * window.innerHeight, Math.random() * window.innerHeight],
-                opacity: [0, 1, 0]
-              }}
-              transition={{
-                duration: Math.random() * 10 + 10,
-                repeat: Infinity,
-                delay: Math.random() * 5
-              }}
-              style={{
-                left: Math.random() * window.innerWidth,
-                top: Math.random() * window.innerHeight
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Main content */}
-        <div className="relative z-10">
-          <AnimatePresence mode="wait">
-            <Routes>
-              {/* SPA Dynamic Routes */}
-              <Route 
-                path="/" 
-                element={
-                  <motion.div
-                    key="home"
-                    initial="initial"
-                    animate="in"
-                    exit="out"
-                    variants={pageVariants}
-                    transition={pageTransition}
-                  >
-                    <DynamicPage />
-                  </motion.div>
-                } 
-              />
-              
-              <Route 
-                path="/:serviceName" 
-                element={
-                  <motion.div
-                    key="service"
-                    initial="initial"
-                    animate="in"
-                    exit="out"
-                    variants={pageVariants}
-                    transition={pageTransition}
-                  >
-                    <DynamicPage />
-                  </motion.div>
-                } 
-              />
-              
-              <Route 
-                path="/:serviceName/get-key/:time" 
-                element={
-                  <motion.div
-                    key="progress"
-                    initial="initial"
-                    animate="in"
-                    exit="out"
-                    variants={pageVariants}
-                    transition={pageTransition}
-                  >
-                    <DynamicPage />
-                  </motion.div>
-                } 
-              />
-              
-              <Route 
-                path="/key/:time/:sessionId" 
-                element={
-                  <motion.div
-                    key="key"
-                    initial="initial"
-                    animate="in"
-                    exit="out"
-                    variants={pageVariants}
-                    transition={pageTransition}
-                  >
-                    <DynamicPage />
-                  </motion.div>
-                } 
-              />
-              
-              {/* Catch all route for 404 */}
-              <Route 
-                path="*" 
-                element={
-                  <motion.div
-                    key="404"
-                    initial="initial"
-                    animate="in"
-                    exit="out"
-                    variants={pageVariants}
-                    transition={pageTransition}
-                    className="flex items-center justify-center min-h-screen"
-                  >
-                    <div className="text-center">
-                      <h1 className="text-6xl font-bold text-gradient mb-4">404</h1>
-                      <p className="text-xl text-gray-400 mb-8">Trang không tìm thấy</p>
-                      <button
-                        onClick={() => window.location.href = '/'}
-                        className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                      >
-                        Về trang chủ
-                      </button>
-                    </div>
-                  </motion.div>
-                } 
-              />
-              
-              {/* Blocked page route */}
-              <Route 
-                path="/blocked" 
-                element={
-                  <motion.div
-                    key="blocked"
-                    initial="initial"
-                    animate="in"
-                    exit="out"
-                    variants={pageVariants}
-                    transition={pageTransition}
-                    className="flex items-center justify-center min-h-screen"
-                  >
-                    <BlockedPage />
-                  </motion.div>
-                } 
-              />
-            </Routes>
-          </AnimatePresence>
-        </div>
+      {/* Animated background particles */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        {particles.map((p, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-blue-500/30 rounded-full"
+            animate={{
+              x: [p.x1, p.x2],
+              y: [p.y1, p.y2],
+              opacity: [0, 1, 0]
+            }}
+            transition={{
+              duration: p.duration,
+              repeat: Infinity,
+              delay: p.delay
+            }}
+            style={{
+              left: p.left,
+              top: p.top
+            }}
+          />
+        ))}
       </div>
+
+      {/* Main content */}
+      <div className="relative z-10">
+        <AnimatePresence mode="wait">
+          <Routes>
+            {/* Blocked page route - must be before dynamic routes */}
+            <Route 
+              path="/blocked" 
+              element={
+                <motion.div
+                  key="blocked"
+                  initial="initial"
+                  animate="in"
+                  exit="out"
+                  variants={pageVariants}
+                  transition={pageTransition}
+                  className="flex items-center justify-center min-h-screen"
+                >
+                  <BlockedPage />
+                </motion.div>
+              } 
+            />
+
+            {/* SPA Dynamic Routes */}
+            <Route 
+              path="/" 
+              element={
+                <motion.div
+                  key="home"
+                  initial="initial"
+                  animate="in"
+                  exit="out"
+                  variants={pageVariants}
+                  transition={pageTransition}
+                >
+                  <DynamicPage />
+                </motion.div>
+              } 
+            />
+            
+            <Route 
+              path="/key/:time/:sessionId" 
+              element={
+                <motion.div
+                  key="key"
+                  initial="initial"
+                  animate="in"
+                  exit="out"
+                  variants={pageVariants}
+                  transition={pageTransition}
+                >
+                  <DynamicPage />
+                </motion.div>
+              } 
+            />
+
+            <Route 
+              path="/:serviceName/get-key/:time" 
+              element={
+                <motion.div
+                  key="progress"
+                  initial="initial"
+                  animate="in"
+                  exit="out"
+                  variants={pageVariants}
+                  transition={pageTransition}
+                >
+                  <DynamicPage />
+                </motion.div>
+              } 
+            />
+            
+            <Route 
+              path="/:serviceName" 
+              element={
+                <motion.div
+                  key="service"
+                  initial="initial"
+                  animate="in"
+                  exit="out"
+                  variants={pageVariants}
+                  transition={pageTransition}
+                >
+                  <DynamicPage />
+                </motion.div>
+              } 
+            />
+            
+            {/* Catch all route for 404 */}
+            <Route 
+              path="*" 
+              element={
+                <motion.div
+                  key="404"
+                  initial="initial"
+                  animate="in"
+                  exit="out"
+                  variants={pageVariants}
+                  transition={pageTransition}
+                  className="flex items-center justify-center min-h-screen"
+                >
+                  <div className="text-center">
+                    <h1 className="text-6xl font-bold text-gradient mb-4">404</h1>
+                    <p className="text-xl text-gray-400 mb-8">Trang không tìm thấy</p>
+                    <button
+                      onClick={() => navigate('/')}
+                      className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                    >
+                      Về trang chủ
+                    </button>
+                  </div>
+                </motion.div>
+              } 
+            />
+          </Routes>
+        </AnimatePresence>
+      </div>
+    </div>
   );
 };
 

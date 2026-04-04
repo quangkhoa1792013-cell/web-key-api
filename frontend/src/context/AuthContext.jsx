@@ -14,7 +14,9 @@ const AUTH_ACTIONS = {
   SET_KEY: 'SET_KEY',
   LOGOUT: 'LOGOUT',
   SET_HWID: 'SET_HWID',
-  BLOCK_ACCESS: 'BLOCK_ACCESS'
+  BLOCK_ACCESS: 'BLOCK_ACCESS',
+  SET_AUTHENTICATED: 'SET_AUTHENTICATED',
+  SET_LOADING: 'SET_LOADING'
 };
 
 // State ban đầu
@@ -58,7 +60,8 @@ const authReducer = (state, action) => {
     
     case AUTH_ACTIONS.LOGOUT:
       return {
-        ...initialState
+        ...initialState,
+        isLoading: false
       };
     
     case AUTH_ACTIONS.BLOCK_ACCESS:
@@ -66,6 +69,18 @@ const authReducer = (state, action) => {
         ...state,
         isBlocked: true,
         isAuthenticated: false
+      };
+
+    case AUTH_ACTIONS.SET_AUTHENTICATED:
+      return {
+        ...state,
+        isAuthenticated: action.payload
+      };
+
+    case AUTH_ACTIONS.SET_LOADING:
+      return {
+        ...state,
+        isLoading: action.payload
       };
     
     default:
@@ -80,6 +95,52 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Auto-generate HWID
+  const generateHWID = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('HWID fingerprint', 2, 2);
+      const fingerprint = canvas.toDataURL();
+      
+      // Combine với browser info
+      const browserInfo = navigator.userAgent + navigator.language + screen.width + screen.height;
+      const combined = fingerprint + browserInfo;
+      
+      // Generate hash
+      let hash = 0;
+      for (let i = 0; i < combined.length; i++) {
+        const char = combined.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      
+      return 'HWID-' + Math.abs(hash).toString(16).toUpperCase();
+    } catch (error) {
+      return 'HWID-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    }
+  };
+
+  // Auto-generate Session ID
+  const generateSessionId = () => {
+    return 'SESS-' + Math.random().toString(36).substring(2, 15).toUpperCase() + 
+           Math.random().toString(36).substring(2, 15).toUpperCase();
+  };
+
+  // Get IP from API or fallback
+  const getIP = async () => {
+    try {
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      console.warn('Failed to fetch real IP, letting backend handle it');
+      return null; // Let backend handle IP via X-Forwarded-For
+    }
+  };
+
   // Auto-initialize session on mount
   useEffect(() => {
     const initializeSession = async () => {
@@ -92,10 +153,14 @@ export const AuthProvider = ({ children }) => {
         }
         dispatch({ type: AUTH_ACTIONS.SET_HWID, payload: hwid });
 
-        // Auto-generate session ID
-        const sessionId = generateSessionId();
-        dispatch({ type: AUTH_ACTIONS.SET_SESSION, payload: sessionId });
-        localStorage.setItem('sessionId', sessionId);
+        // Get session ID from backend or generate temporary
+        let sessionId = localStorage.getItem('sessionId');
+        if (!sessionId) {
+          // Don't auto-generate - let backend assign session ID
+          sessionId = null;
+        } else {
+          dispatch({ type: AUTH_ACTIONS.SET_SESSION, payload: sessionId });
+        }
 
         // Get IP address
         const ip = await getIP();
@@ -148,48 +213,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [state.hwid]);
 
-  // Auto-generate HWID
-  const generateHWID = () => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.textBaseline = 'top';
-    ctx.font = '14px Arial';
-    ctx.fillText('HWID fingerprint', 2, 2);
-    const fingerprint = canvas.toDataURL();
-    
-    // Combine với browser info
-    const browserInfo = navigator.userAgent + navigator.language + screen.width + screen.height;
-    const combined = fingerprint + browserInfo;
-    
-    // Generate hash
-    let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-      const char = combined.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    
-    return 'HWID-' + Math.abs(hash).toString(16).toUpperCase();
-  };
-
-  // Auto-generate Session ID
-  const generateSessionId = () => {
-    return 'SESS-' + Math.random().toString(36).substring(2, 15).toUpperCase() + 
-           Math.random().toString(36).substring(2, 15).toUpperCase();
-  };
-
-  // Get IP from API or fallback
-  const getIP = async () => {
-    try {
-      const response = await fetch('https://api.ipify.org?format=json');
-      const data = await response.json();
-      return data.ip;
-    } catch (error) {
-      // Fallback to a default IP or generate one
-      return '192.168.1.' + Math.floor(Math.random() * 254 + 1);
-    }
-  };
-
   // Action creators
   const actions = {
     setSession: (sessionId) => {
@@ -214,7 +237,6 @@ export const AuthProvider = ({ children }) => {
         localStorage.clear();
       } catch (error) {
         console.error('Failed to logout and clear localStorage:', error);
-        // Vẫn dispatch logout action ngay cả khi localStorage lỗi
         dispatch({ type: AUTH_ACTIONS.LOGOUT });
       }
     },
